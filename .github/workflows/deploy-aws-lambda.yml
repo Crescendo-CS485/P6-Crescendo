@@ -1,0 +1,70 @@
+name: Deploy Backend to AWS Lambda
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Set up Python (same version as Lambda runtime) ───────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── Install dependencies into backend/package/ ────────────────────────
+      - name: Install dependencies into package directory
+        working-directory: backend
+        run: |
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.12 \
+            --only-binary=:all: \
+            --target package \
+            -r requirements.txt
+
+      # ── Copy application source into the package directory ────────────────
+      - name: Copy app source into package
+        working-directory: backend
+        run: |
+          cp -r app package/app
+          cp config.py package/config.py
+          cp lambda_handler.py package/lambda_handler.py
+
+      # ── Zip the package ───────────────────────────────────────────────────
+      - name: Zip deployment package
+        working-directory: backend/package
+        run: zip -r ../deployment.zip . -x "*.pyc" -x "*/__pycache__/*"
+
+      # ── Configure AWS credentials ─────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # ── Deploy to Lambda ──────────────────────────────────────────────────
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name crescendo-api \
+            --zip-file fileb://backend/deployment.zip
+
+      # ── Wait for update to propagate, then verify ─────────────────────────
+      - name: Wait for Lambda update to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name crescendo-api
+          echo "Lambda deployment successful."
+          aws lambda get-function-configuration \
+            --function-name crescendo-api \
+            --query '{State:State,LastUpdateStatus:LastUpdateStatus}' \
+            --output json

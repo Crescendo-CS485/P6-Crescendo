@@ -1,0 +1,83 @@
+name: Deploy Frontend to AWS Amplify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Set up Node and build the frontend ───────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ── Configure AWS credentials ─────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # ── Trigger Amplify redeploy from the connected repository ────────────
+      # Amplify is connected to this GitHub repository and builds from source.
+      # Calling start-job with type RELEASE tells Amplify to pull the latest
+      # commit on the connected branch and re-run the amplify.yml build.
+      - name: Trigger Amplify redeploy
+        id: amplify_job
+        run: |
+          JOB_ID=$(aws amplify start-job \
+            --app-id d291kg32gzfrfc \
+            --branch-name main \
+            --job-type RELEASE \
+            --query "jobSummary.jobId" \
+            --output text)
+          echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
+          echo "Triggered Amplify job: $JOB_ID"
+
+      # ── Poll until the Amplify job completes ──────────────────────────────
+      - name: Wait for Amplify deployment to complete
+        run: |
+          APP_ID="d291kg32gzfrfc"
+          BRANCH="main"
+          JOB_ID="${{ steps.amplify_job.outputs.job_id }}"
+
+          echo "Waiting for Amplify job $JOB_ID to finish..."
+          for i in $(seq 1 40); do
+            STATUS=$(aws amplify get-job \
+              --app-id "$APP_ID" \
+              --branch-name "$BRANCH" \
+              --job-id "$JOB_ID" \
+              --query "job.summary.status" \
+              --output text)
+
+            echo "Attempt $i/40 — status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEED" ]; then
+              echo "Amplify deployment succeeded."
+              exit 0
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Amplify deployment ended with status: $STATUS"
+              exit 1
+            fi
+
+            sleep 15
+          done
+
+          echo "Timed out waiting for Amplify deployment."
+          exit 1

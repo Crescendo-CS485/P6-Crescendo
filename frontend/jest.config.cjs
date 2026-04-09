@@ -9,6 +9,7 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "\\.(css|less|scss|sass)$": "<rootDir>/__mocks__/styleMock.cjs",
+    "^.*/lib/api$": "<rootDir>/__mocks__/apiMock.cjs",
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testMatch: [

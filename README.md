@@ -529,6 +529,227 @@ If you fork this repo you can run the same CD pipeline against your own AWS acco
 | **Deploy Backend to AWS Lambda** | `.github/workflows/deploy-aws-lambda.yml` | Packages the Flask app and calls `aws lambda update-function-code` |
 | **Deploy Frontend to AWS Amplify** | `.github/workflows/deploy-aws-amplify.yml` | Builds the React app and waits for Amplify's auto-triggered job to finish |
 
+The steps below are written for the **AWS Management Console**. If you prefer the command line, expand the CLI Quickstart below — it covers the same five setup steps using only the AWS CLI and GitHub CLI.
+
+<details>
+<summary><strong>CLI Quickstart — AWS CLI + GitHub CLI alternative</strong></summary>
+
+**Prerequisites:**
+- AWS CLI v2 installed and configured with admin credentials: `aws configure`
+- GitHub CLI installed and authenticated: `gh auth login`
+- Set these shell variables once — they are reused throughout every command below:
+
+```bash
+REGION=us-east-1
+FUNCTION_NAME=crescendo-api        # must match deploy-aws-lambda.yml
+REPO=YOUR_ORG/YOUR_REPO            # e.g. Crescendo-CS485/P6-Crescendo
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+```
+
+---
+
+#### CLI Step 1 — Create RDS PostgreSQL
+
+```bash
+# Security group — allow Postgres inbound (restrict to specific IPs in production)
+SG_ID=$(aws ec2 create-security-group \
+  --group-name crescendo-rds-sg \
+  --description "Crescendo RDS access" \
+  --query GroupId --output text --region $REGION)
+
+aws ec2 authorize-security-group-ingress \
+  --group-id $SG_ID --protocol tcp --port 5432 \
+  --cidr 0.0.0.0/0 --region $REGION
+
+# Create the instance (takes ~5 minutes)
+aws rds create-db-instance \
+  --db-instance-identifier crescendo-db \
+  --db-instance-class db.t3.micro \
+  --engine postgres \
+  --master-username adminuser \
+  --master-user-password 'YOUR_DB_PASSWORD' \
+  --allocated-storage 20 \
+  --publicly-accessible \
+  --vpc-security-group-ids $SG_ID \
+  --region $REGION
+
+aws rds wait db-instance-available \
+  --db-instance-identifier crescendo-db --region $REGION
+
+RDS_ENDPOINT=$(aws rds describe-db-instances \
+  --db-instance-identifier crescendo-db \
+  --query 'DBInstances[0].Endpoint.Address' \
+  --output text --region $REGION)
+
+echo "RDS endpoint: $RDS_ENDPOINT"
+
+# Create the empty database
+psql -h $RDS_ENDPOINT -U adminuser \
+  -c "CREATE DATABASE crescendo_p4;"
+```
+
+---
+
+#### CLI Step 2 — Create the Lambda function
+
+```bash
+# Execution role Lambda needs to write CloudWatch logs
+aws iam create-role \
+  --role-name crescendo-lambda-role \
+  --assume-role-policy-document \
+    '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+
+aws iam attach-role-policy \
+  --role-name crescendo-lambda-role \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+# Placeholder ZIP — the CD workflow overwrites this on first push
+mkdir -p /tmp/crescendo-placeholder
+echo 'def handler(e, c): return {"statusCode": 200}' \
+  > /tmp/crescendo-placeholder/lambda_handler.py
+cd /tmp/crescendo-placeholder && zip /tmp/placeholder.zip lambda_handler.py && cd -
+
+# Create the function
+aws lambda create-function \
+  --function-name $FUNCTION_NAME \
+  --runtime python3.12 \
+  --role arn:aws:iam::${ACCOUNT_ID}:role/crescendo-lambda-role \
+  --handler lambda_handler.handler \
+  --zip-file fileb:///tmp/placeholder.zip \
+  --timeout 30 \
+  --region $REGION
+
+aws lambda wait function-active \
+  --function-name $FUNCTION_NAME --region $REGION
+
+# Set environment variables
+aws lambda update-function-configuration \
+  --function-name $FUNCTION_NAME \
+  --environment "Variables={\
+DATABASE_URL=postgresql://adminuser:YOUR_DB_PASSWORD@${RDS_ENDPOINT}:5432/crescendo_p4,\
+ANTHROPIC_API_KEY=YOUR_ANTHROPIC_KEY,\
+SECRET_KEY=replace-with-a-long-random-string}" \
+  --region $REGION
+
+# Create a public function URL and allow unauthenticated invocations
+aws lambda create-function-url-config \
+  --function-name $FUNCTION_NAME \
+  --auth-type NONE --region $REGION
+
+aws lambda add-permission \
+  --function-name $FUNCTION_NAME \
+  --statement-id AllowPublicFunctionUrl \
+  --action lambda:InvokeFunctionUrl \
+  --principal '*' \
+  --function-url-auth-type NONE \
+  --region $REGION
+
+# Print the URL — update VITE_API_BASE_URL / vite.config.ts to point here
+aws lambda get-function-url-config \
+  --function-name $FUNCTION_NAME \
+  --query FunctionUrl --output text --region $REGION
+```
+
+---
+
+#### CLI Step 3 — Create the Amplify app
+
+Amplify's automated GitHub integration requires a GitHub Personal Access Token with `repo` scope.
+Generate one at [github.com/settings/tokens](https://github.com/settings/tokens), then:
+
+```bash
+AMPLIFY_APP_ID=$(aws amplify create-app \
+  --name crescendo-frontend \
+  --repository https://github.com/$REPO \
+  --access-token YOUR_GITHUB_PAT \
+  --query 'app.appId' --output text --region $REGION)
+
+aws amplify create-branch \
+  --app-id $AMPLIFY_APP_ID \
+  --branch-name main --region $REGION
+
+echo "Amplify App ID: $AMPLIFY_APP_ID"
+
+# Patch the workflow file with your App ID
+# macOS:
+sed -i '' "s/d291kg32gzfrfc/$AMPLIFY_APP_ID/g" \
+  .github/workflows/deploy-aws-amplify.yml
+# Linux:
+# sed -i "s/d291kg32gzfrfc/$AMPLIFY_APP_ID/g" \
+#   .github/workflows/deploy-aws-amplify.yml
+
+git add .github/workflows/deploy-aws-amplify.yml
+git commit -m "chore: set Amplify app ID for fork"
+```
+
+---
+
+#### CLI Step 4 — Create the IAM deploy user
+
+```bash
+aws iam create-user --user-name crescendo-github-actions
+
+cat > /tmp/deploy-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:UpdateFunctionCode",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration"
+      ],
+      "Resource": "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}"
+    },
+    {
+      "Sid": "AmplifyDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "amplify:ListJobs",
+        "amplify:GetJob",
+        "amplify:StartJob"
+      ],
+      "Resource": "arn:aws:amplify:${REGION}:${ACCOUNT_ID}:apps/${AMPLIFY_APP_ID}/branches/main/jobs/*"
+    }
+  ]
+}
+EOF
+
+aws iam put-user-policy \
+  --user-name crescendo-github-actions \
+  --policy-name CrescendoDeploy \
+  --policy-document file:///tmp/deploy-policy.json
+
+# Create the access key — the secret is shown once, save it immediately
+aws iam create-access-key --user-name crescendo-github-actions
+```
+
+---
+
+#### CLI Step 5 — Store secrets with the GitHub CLI
+
+```bash
+# gh prompts for the value securely (no value appears in shell history)
+gh secret set AWS_ACCESS_KEY_ID     --repo $REPO
+gh secret set AWS_SECRET_ACCESS_KEY --repo $REPO
+gh secret set AWS_REGION --body "$REGION" --repo $REPO
+```
+
+---
+
+#### CLI Step 6 — Push and watch
+
+```bash
+git push origin main
+
+# Stream live workflow logs in your terminal
+gh run watch --repo $REPO
+```
+
+</details>
+
 ### Step 1 — Create a PostgreSQL database
 
 Lambda needs a persistent database. The simplest option is **Amazon RDS** (Postgres engine):

@@ -34,21 +34,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # ── Trigger Amplify redeploy from the connected repository ────────────
-      # Amplify is connected to this GitHub repository and builds from source.
-      # Calling start-job with type RELEASE tells Amplify to pull the latest
-      # commit on the connected branch and re-run the amplify.yml build.
-      - name: Trigger Amplify redeploy
+      # ── Get the Amplify job triggered by this push ───────────────────────
+      # Amplify is connected to this repository and auto-starts a build when
+      # main is updated. We wait briefly for Amplify to pick up the push, then
+      # retrieve the latest job ID instead of starting a duplicate job.
+      - name: Get latest Amplify job ID
         id: amplify_job
         run: |
-          JOB_ID=$(aws amplify start-job \
+          echo "Waiting for Amplify to pick up the push..."
+          sleep 15
+          JOB_ID=$(aws amplify list-jobs \
             --app-id d291kg32gzfrfc \
             --branch-name main \
-            --job-type RELEASE \
-            --query "jobSummary.jobId" \
+            --max-results 1 \
+            --query "jobSummaries[0].jobId" \
             --output text)
           echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
-          echo "Triggered Amplify job: $JOB_ID"
+          echo "Tracking Amplify job: $JOB_ID"
 
       # ── Poll until the Amplify job completes ──────────────────────────────
       - name: Wait for Amplify deployment to complete

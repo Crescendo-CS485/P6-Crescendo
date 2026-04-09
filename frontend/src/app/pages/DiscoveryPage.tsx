@@ -27,6 +27,7 @@ interface ArtistsResponse {
 type SortOption = "activity" | "recent";
 type DevState = "loading" | "error" | "empty";
 
+// Builds a URL query string, omitting falsy/empty values and expanding arrays
 export function buildParams(params: Record<string, unknown>): string {
   const sp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

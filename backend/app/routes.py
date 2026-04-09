@@ -269,6 +269,7 @@ def get_all_discussions():
     })
 
 
+# Platform stats endpoint — returns aggregate counts for the home page banner
 @bp.route("/stats")
 def get_stats():
     from .models import LLMPersona

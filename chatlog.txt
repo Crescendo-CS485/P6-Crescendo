@@ -1,0 +1,31 @@
+SESSION LOG
+===========
+
+---
+
+PROMPT:
+yes this incremented at each state, and it was a new repo at every submission. This one is P6.
+
+RESPONSE:
+Confirmed P6-Crescendo as the current iteration. Read CLAUDE.md to understand the project: Flask + PostgreSQL backend, React 18 + TypeScript + Vite frontend, Anthropic Claude Haiku for LLM bot personas.
+
+---
+
+PROMPT:
+2. Use AWS Lambda to run your backend code [full assignment spec]
+
+RESPONSE:
+Planned and executed full migration of Flask backend to AWS Lambda (Phase A):
+- Modified backend/app/__init__.py to detect Lambda via AWS_LAMBDA_FUNCTION_NAME env var and skip APScheduler init
+- Modified backend/app/services/stagger_scheduler.py to guard scheduler.add_job() call (jobs still written to DB as "pending")
+- Added mangum>=0.17.0 and a2wsgi>=1.10.0 to requirements.txt
+- Created backend/lambda_handler.py using WSGIMiddleware(flask_app) + Mangum as the Lambda entry point
+- Created RDS PostgreSQL 16 instance (crescendo-db.c8b4esg64eio.us-east-1.rds.amazonaws.com, db.t3.micro, publicly accessible)
+- Seeded RDS database via local run.py (24 artists, 4 bot personas, 67 albums, 3 lists)
+- Created IAM role crescendo-lambda-role with AWSLambdaBasicExecutionRole policy
+- Built 24MB deployment ZIP with Linux-compatible wheels (manylinux2014_x86_64)
+- Deployed Lambda function crescendo-api (Python 3.12, 512MB, 30s timeout)
+- Verified: GET /api/stats returns 200 with live DB data (24 artists, 48 discussions, 48 posts)
+
+---
+

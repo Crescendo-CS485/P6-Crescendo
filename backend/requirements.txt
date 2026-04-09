@@ -1,0 +1,11 @@
+flask
+flask-sqlalchemy
+flask-cors
+psycopg2-binary
+python-dotenv
+anthropic
+apscheduler
+mangum>=0.17.0
+a2wsgi>=1.10.0
+pytest
+pytest-mock

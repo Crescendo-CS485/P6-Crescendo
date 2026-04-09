@@ -3,6 +3,25 @@ A full-stack music discovery platform with AI-powered community discussions. Use
 
 ---
 
+## Using the Live App
+
+The app is publicly deployed and requires no installation:
+
+**Frontend (React):** [https://main.d291kg32gzfrfc.amplifyapp.com](https://main.d291kg32gzfrfc.amplifyapp.com)
+
+Open that URL in any modern browser. From there you can:
+
+- **Browse artists** on the Discovery page — filter by genre, sort by activity or name, search by keyword.
+- **View an artist** — click any card to see the artist's bio, albums, and discussion threads.
+- **Read discussions** — click a thread title to see all posts, including AI bot replies (labeled **BOT**).
+- **Post a comment** — log in (or register a free account) and reply to any discussion.
+- **Trigger AI activity** — on any artist page, click **Trigger LLM Activity** to schedule 1–5 bot personas to post Claude-generated replies within the next two minutes.
+- **Curate lists** — create and manage personal album lists from the Lists page.
+
+> The backend API runs on AWS Lambda behind a function URL. Requests from the frontend go directly to Lambda; no separate backend URL is needed.
+
+---
+
 ## Running Tests Locally
 
 ### Backend Tests
@@ -498,3 +517,131 @@ P4 Crescendo/
     ├── vite.config.ts           # Vite config + /api proxy
     └── package.json
 ```
+
+---
+
+## Deploying to AWS (Fork Setup)
+
+If you fork this repo you can run the same CD pipeline against your own AWS account. The two workflows that run on every push to `main` are:
+
+| Workflow | File | What it does |
+|----------|------|--------------|
+| **Deploy Backend to AWS Lambda** | `.github/workflows/deploy-aws-lambda.yml` | Packages the Flask app and calls `aws lambda update-function-code` |
+| **Deploy Frontend to AWS Amplify** | `.github/workflows/deploy-aws-amplify.yml` | Builds the React app and waits for Amplify's auto-triggered job to finish |
+
+### Step 1 — Create a PostgreSQL database
+
+Lambda needs a persistent database. The simplest option is **Amazon RDS** (Postgres engine):
+
+1. In the AWS console open **RDS → Create database**.
+2. Choose **PostgreSQL**, Free Tier template.
+3. Note the **endpoint**, **port** (5432), **username**, and **password** you set.
+4. In the security group, allow inbound TCP 5432 from the Lambda function's VPC (or from `0.0.0.0/0` for a quick test).
+
+Your `DATABASE_URL` will be:
+```
+postgresql://USER:PASSWORD@RDS_ENDPOINT:5432/crescendo_p4
+```
+
+Create the empty database once:
+```bash
+psql -h RDS_ENDPOINT -U USER -c "CREATE DATABASE crescendo_p4;"
+```
+
+The app creates tables and seeds data automatically on first startup.
+
+### Step 2 — Create the Lambda function (backend)
+
+1. In the AWS console open **Lambda → Create function**.
+2. Choose **Author from scratch**.
+   - **Function name**: `crescendo-api` (or any name — update the workflow file to match).
+   - **Runtime**: Python 3.12.
+   - **Architecture**: x86_64.
+3. After creation, go to **Configuration → Environment variables** and add:
+
+   | Key | Value |
+   |-----|-------|
+   | `DATABASE_URL` | `postgresql://USER:PASSWORD@RDS_ENDPOINT:5432/crescendo_p4` |
+   | `ANTHROPIC_API_KEY` | Your key from [console.anthropic.com](https://console.anthropic.com/) |
+   | `SECRET_KEY` | Any long random string |
+
+4. Under **Configuration → General configuration**, increase **Timeout** to at least **30 seconds** (seeding on cold start can take a few seconds).
+5. Under **Configuration → Function URL**, click **Create function URL**, auth type **NONE**. Copy the URL — this is your API base URL.
+6. Update the frontend's `VITE_API_BASE_URL` (or the Vite proxy target) to point at your function URL.
+
+> If you rename the function from `crescendo-api`, open `.github/workflows/deploy-aws-lambda.yml` and update the two `--function-name crescendo-api` references to match.
+
+### Step 3 — Create the Amplify app (frontend)
+
+1. In the AWS console open **AWS Amplify → New app → Host web app**.
+2. Connect your **forked GitHub repository**, branch `main`.
+3. Amplify will detect the `amplify.yml` at the repo root and use it for the build.
+4. Complete the setup. Note your **App ID** (looks like `d2xxxxxxxxx`).
+5. Open `.github/workflows/deploy-aws-amplify.yml` and replace both occurrences of `d291kg32gzfrfc` with your App ID.
+
+### Step 4 — Create an IAM user with least-privilege access
+
+1. In the AWS console open **IAM → Users → Create user**.
+2. Name it something like `crescendo-github-actions`.
+3. Attach the following inline policy (replace `YOUR_ACCOUNT_ID`, `YOUR_REGION`, `YOUR_FUNCTION_NAME`, and `YOUR_AMPLIFY_APP_ID`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:UpdateFunctionCode",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration"
+      ],
+      "Resource": "arn:aws:lambda:YOUR_REGION:YOUR_ACCOUNT_ID:function:YOUR_FUNCTION_NAME"
+    },
+    {
+      "Sid": "AmplifyDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "amplify:ListJobs",
+        "amplify:GetJob",
+        "amplify:StartJob"
+      ],
+      "Resource": "arn:aws:amplify:YOUR_REGION:YOUR_ACCOUNT_ID:apps/YOUR_AMPLIFY_APP_ID/branches/main/jobs/*"
+    }
+  ]
+}
+```
+
+4. Go to **Security credentials → Create access key** (use case: **Other**). Download the CSV — you will not be able to view the secret key again.
+
+### Step 5 — Store secrets in GitHub
+
+1. In your forked repository, go to **Settings → Secrets and variables → Actions → New repository secret**.
+2. Add these three secrets:
+
+   | Secret name | Value |
+   |-------------|-------|
+   | `AWS_ACCESS_KEY_ID` | Access key ID from the CSV |
+   | `AWS_SECRET_ACCESS_KEY` | Secret access key from the CSV |
+   | `AWS_REGION` | The region where you created Lambda and Amplify (e.g. `us-east-1`) |
+
+### Step 6 — Push to main
+
+With the workflow files updated (function name, Amplify app ID) and secrets in place, push any commit to `main`:
+
+```bash
+git push origin main
+```
+
+The Actions tab will show five concurrent workflows:
+
+| Workflow | Expected outcome |
+|----------|------------------|
+| Backend Tests | pytest suite passes |
+| Frontend Tests | `npm run build` + Jest passes |
+| Integration Tests | Playwright E2E passes |
+| Deploy Backend to AWS Lambda | ZIP uploaded, `lambda:UpdateFunctionCode` succeeds |
+| Deploy Frontend to AWS Amplify | Amplify build job completes with status `SUCCEED` |
+
+Once both deploy workflows are green, your fork is live.

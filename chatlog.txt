@@ -29,3 +29,86 @@ Planned and executed full migration of Flask backend to AWS Lambda (Phase A):
 
 ---
 
+PROMPT:
+[Part 8 — CD Pipelines] Use GitHub Actions to automatically deploy on each push to main — deploy-aws-lambda.yml that packages and deploys backend Lambda code; deploy-aws-amplify.yml that triggers Amplify to redeploy frontend.
+
+RESPONSE:
+Created two CD workflows and merged them to main via PR #3 (all 3 CI checks green):
+
+deploy-aws-lambda.yml:
+- Installs Python 3.12 deps with manylinux2014_x86_64 wheels into backend/package/
+- Copies app/, config.py, lambda_handler.py into the package directory
+- Zips the package (excluding .pyc and __pycache__)
+- Uses aws-actions/configure-aws-credentials@v4 with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION secrets
+- Calls aws lambda update-function-code --function-name crescendo-api
+- Polls aws lambda wait function-updated to confirm rollout
+
+deploy-aws-amplify.yml:
+- Builds the frontend with npm run build
+- Waits 15s for Amplify's auto-triggered job (GitHub webhook) to appear
+- Retrieves the latest job ID via aws amplify list-jobs (avoids LimitExceededException from calling start-job when a job is already running)
+- Polls aws amplify get-job every 15s until status is SUCCEED, FAILED, or CANCELLED
+
+Both workflows triggered successfully on the merge-to-main push; all 5 workflows (Backend Tests, Frontend Tests, Integration Tests, Deploy Backend to Lambda, Deploy Frontend to Amplify) completed with conclusion: success.
+
+---
+
+PROMPT:
+Great! Final step. Wrap it up. Edit the README.md file for your project. Provide instructions for web users of your app to run your application. Provide all the instructions needed for a random person on the Internet who forks your codebase to set up AWS to deploy your application.
+
+RESPONSE:
+Added two new sections to README.md and pushed directly to main:
+
+"Using the Live App" section (near the top):
+- Live URL: https://main.d291kg32gzfrfc.amplifyapp.com
+- Walkthrough of all features: browse/filter/search artists, view discussions, post comments, trigger AI activity, curate lists
+
+"Deploying to AWS (Fork Setup)" section (at the end, after section 9):
+- Step 1: Create RDS PostgreSQL instance and get DATABASE_URL
+- Step 2: Create Lambda function (runtime, env vars, timeout, function URL) with note on renaming in workflow
+- Step 3: Create Amplify app connected to fork and update app ID in workflow file
+- Step 4: Create IAM user with exact least-privilege inline policy scoped to Lambda + Amplify resources only
+- Step 5: Store AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION as GitHub repository secrets
+- Step 6: Push to main — table showing all 5 expected workflow outcomes
+
+---
+
+PROMPT:
+can you also add the instructions to do this via the aws CLI and GH CLI
+
+RESPONSE:
+Added a collapsible <details> CLI Quickstart block inside the "Deploying to AWS" section, covering all 6 steps with copy-paste commands:
+- Step 1: aws ec2 create-security-group + aws rds create-db-instance + aws rds wait + psql CREATE DATABASE
+- Step 2: aws iam create-role + aws lambda create-function (placeholder ZIP) + aws lambda update-function-configuration (env vars) + aws lambda create-function-url-config (public URL) + aws lambda add-permission
+- Step 3: aws amplify create-app + aws amplify create-branch + sed -i to patch app ID into workflow file + git commit
+- Step 4: aws iam create-user + heredoc inline policy JSON + aws iam put-user-policy + aws iam create-access-key
+- Step 5: gh secret set for all three secrets
+- Step 6: git push origin main + gh run watch
+
+---
+
+PROMPT:
+okay using my aws cli, can you create a read only user for resources and dashboard access for others to explore our tenant?
+
+RESPONSE:
+Created IAM user crescendo-readonly with the AWS managed ReadOnlyAccess policy and a console login profile:
+- aws iam create-user --user-name crescendo-readonly
+- aws iam attach-user-policy --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+- aws iam create-login-profile --password-reset-required
+
+Console URL : https://940482408601.signin.aws.amazon.com/console
+Username    : crescendo-readonly
+Temp PW     : Crescendo#ReadOnly1!
+(User must set a new password on first login)
+
+User can view all AWS resources (Lambda, RDS, Amplify, CloudWatch, etc.) but cannot create, modify, delete, or trigger any resource.
+
+---
+
+PROMPT:
+okay, let's add/append our chat to chatlog.txt and push all of this upstream to main.
+
+RESPONSE:
+Appended all Part 8 session exchanges to chatlog.txt and pushed to main.
+
+---

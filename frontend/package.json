@@ -6,7 +6,9 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "test": "jest --config jest.config.cjs"
+    "test": "jest --config jest.config.cjs",
+    "test:integration": "playwright test --config playwright.config.ts",
+    "test:integration:deployed": "BASE_URL=https://main.d291kg32gzfrfc.amplifyapp.com playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "1.1.4",
@@ -31,6 +33,7 @@
     "@babel/preset-env": "^7.29.2",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

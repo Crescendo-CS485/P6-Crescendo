@@ -16,6 +16,10 @@ module.exports = {
     "**/__tests__/**/*.{ts,tsx}",
     "**/*.{test,spec}.{ts,tsx}",
   ],
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/tests/integration/",
+  ],
   collectCoverage: true,
   collectCoverageFrom: [
     "<rootDir>/src/app/pages/DiscoveryPage.tsx",

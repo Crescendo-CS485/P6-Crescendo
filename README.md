@@ -1,4 +1,5 @@
 # Crescendo
+-Tester
 A full-stack music discovery platform with AI-powered community discussions. Users can browse artists and albums, post in discussion threads, and curate personal lists. Synthetic bot personas (powered by Claude Haiku) automatically seed and respond to discussions to simulate organic fan activity — all transparently labeled.
 
 ---

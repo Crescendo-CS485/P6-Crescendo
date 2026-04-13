@@ -30,7 +30,7 @@ class ActivityAggregationService:
         # Activity score: base 5.5 + posts (max 3.0) + unique authors (max 1.5)
         post_contribution = min(recent_post_count * 0.5, 3.0)
         author_contribution = min(len(unique_authors) * 0.6, 1.5)
-        artist.activity_score = round(5.5 + post_contribution + author_contribution, 1)
+        artist.activity_score = round(10.0 + post_contribution + author_contribution, 1)
 
         # Update latest thread info
         latest = (

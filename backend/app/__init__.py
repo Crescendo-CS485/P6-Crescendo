@@ -16,7 +16,7 @@ def create_app(test_config=None):
         app.config.from_object("config.Config")
 
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = False
 
     db.init_app(app)
     CORS(app)

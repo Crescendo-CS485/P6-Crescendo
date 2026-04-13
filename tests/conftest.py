@@ -25,9 +25,8 @@ from datetime import datetime, timezone, date
 def app():
     with patch("app.scheduler.init_scheduler"):
         from app import create_app
-        application = create_app()
+        application = create_app({"TESTING": True})
 
-    application.config["TESTING"] = True
     application.config["SECRET_KEY"] = "test-secret"
 
     import app.scheduler as sched_module

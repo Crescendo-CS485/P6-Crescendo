@@ -11,12 +11,12 @@ UI state management:
 
 - Discovery and Filtering: Verified via the Artist Feed and dynamic statistics banner.
 - Artist and Discussions: Verified through profile loading and both anonymous and authenticated
-	post submissions.
+  post submissions.
 - Authentication: Verified via registration, login validation, and session persistence across
-	navigation.
+  navigation.
 - Content Discovery: Verified through the Best Albums, New Releases, and Genres pages.
-- User Lists: Verified via CRUD operations (Create, Read, Update, Delete) for personal album
-	collections.
+- User Lists: Verified via list creation, list retrieval, and adding/removing albums for personal
+  album collections.
 - Global Search: Verified through debounced API queries and result navigation.
 
 ## 2. Integration Test Table
@@ -26,7 +26,7 @@ UI state management:
 | Load default artist list | Open Discovery page; calls `GET /api/artists`. | Status 200; Artist cards (name, image, genre) render on screen. |
 | Filter by genre | Click genre chip; appends `?genre=<name>` to request. | UI displays only artists matching the selected genre. |
 | Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
-| Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on latest discussion activity. |
+| Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
 | Stats banner | Discovery page mount; calls `GET /api/stats`. | Statistics strip displays current artist, discussion, and post counts. |
 | Trigger event | Click Trending button; `POST /api/events` with artist ID. | Status 200; a success toast notification appears in the UI. |
 | Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
@@ -47,7 +47,7 @@ UI state management:
 | Genre card navigation | Click genre card; navigates to filtered Best Albums. | Page loads with `?genre=<name>` pre-applied to the album list. |
 | Lists index load | Open Lists page; calls `GET /api/lists`. | All user-created album lists are rendered. |
 | Create new list | Logged in; `POST /api/lists` with `{ title, description }`. | New list appears in the index immediately. |
-| Add album to list | Open Add modal; `POST /api/lists/<id>/albums`. | Selected album appears in the list detail view. |
+| Add album to list | Open Add modal; `POST /api/lists/<id>/albums` with `{ albumId }`. | Selected album appears in the list detail view. |
 | Remove album from list | Click remove; `DELETE /api/lists/<id>/albums/<album_id>`. | Album is removed from the list detail view. |
 | Search (valid) | Type 2+ chars; `GET /api/search?q=<query>` (debounced). | Dropdown displays matching artists and albums. |
 | Search navigation | Click a search result (Artist or Album). | UI navigates to the appropriate Artist page. |
@@ -56,9 +56,9 @@ UI state management:
 ## 3. Environment Notes
 
 - Local Testing: Requires the Vite development server (`npm run dev`) and the Flask server
-	(`python run.py`) running simultaneously.
+  (`python run.py`) running simultaneously.
 - Deployed Testing: Verified against live AWS infrastructure:
-	- Frontend: `https://main.d291kg32gzfrfc.amplifyapp.com`
-	- Backend: `https://ue039qft5b.execute-api.us-east-1.amazonaws.com/prod`
+  - Frontend: `https://main.d291kg32gzfrfc.amplifyapp.com`
+  - Backend: `https://ue039qft5b.execute-api.us-east-1.amazonaws.com/prod`
 - Environment Switching: Tests are configured to toggle between environments using the
-	`BASE_URL` environment variable.
+  `BASE_URL` environment variable.

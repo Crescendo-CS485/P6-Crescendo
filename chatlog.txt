@@ -112,3 +112,11 @@ RESPONSE:
 Appended all Part 8 session exchanges to chatlog.txt and pushed to main.
 
 ---
+
+---
+
+PROMPT:
+You have been given comments on the previous commits you made in the repository.
+
+RESPONSE:
+Applied PR review feedback in tests/integration/SPEC.md by replacing tab-indented list continuations with spaces, correcting User Lists scope wording (list creation/retrieval + add/remove albums), aligning the "Sort by Most Recent" expectation with backend behavior (discussion count), adding required `{ albumId }` request body for add-to-list, and fixing tab indentation in Environment Notes.

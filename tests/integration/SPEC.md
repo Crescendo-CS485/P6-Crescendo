@@ -39,7 +39,7 @@ UI state management:
 | Sign in (invalid) | Submit Sign In form with incorrect password. | 401 response; error message displayed in the login modal. |
 | Session persistence | Sign in and then navigate to a different page. | `GET /api/auth/me` on mount restores the user's session in the header. |
 | Sign out | Click Sign out; calls `POST /api/auth/logout`. | Header reverts to Sign In / Join guest state. |
-| Authenticated post | Submit post while logged in. | `POST` uses session user; no prompt for display name/handle. |
+| Authenticated post | Submit post while logged in. | `POST /api/discussions/<id>/posts` uses the frontend's signed-in submission flow and includes the author fields sent by the client (for example, `displayName` and `handle`); no separate prompt for display name/handle appears during submission. |
 | Default album list | Open Best Albums; calls `GET /api/albums`. | Album cards render with title, artist, and user scores. |
 | Filter by year | Select year (e.g., 2026); `GET /api/albums?time_range=2026`. | UI displays only albums released in the specified year. |
 | Sort by critic score | Switch sort; re-fetches with `?sort=critic_score`. | Album order matches the backend critic score ranking. |

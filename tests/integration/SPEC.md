@@ -1,8 +1,8 @@
 # Crescendo Integration Test Specification
 
-This document describes every code pathway that requires the execution of both frontend and
-backend code together. Each pathway is listed as a plain-English requirement followed by a
-technical test mapping.
+This document describes the integration pathways covered by this specification where frontend and
+backend code execute together. Each included pathway is listed as a plain-English requirement
+followed by a technical test mapping.
 
 ## 1. Functional Scope
 
@@ -29,7 +29,7 @@ UI state management:
 | Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
 | Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
 | Community stats panel | Open Community page; calls `GET /api/stats` (alongside discussions fetch). | Sidebar displays Active Artists and Community Members from the stats response. |
-| Trigger event | On the Artist page, click `Trigger LLM Activity`; `POST /api/events` with artist ID. | Status 200; a success toast notification appears in the UI. |
+| Trigger event | On the Artist page, click `Trigger LLM Activity`; `POST /api/events` with `artistId` and required `eventType` (for example, `page_activation`). | Status 200; a success toast notification appears in the UI. |
 | Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
 | Load discussion list | Artist page mount; calls `GET /api/artists/<id>/discussions`. | List of discussion threads renders beneath the profile. |
 | Open thread and load posts | Click discussion card; calls `GET /api/discussions/<id>/posts`. | Post bodies render in chronological order. |

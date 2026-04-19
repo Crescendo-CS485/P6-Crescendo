@@ -144,3 +144,11 @@ You have been given comments on the previous commits you made in the repository.
 
 RESPONSE:
 Applied the latest review-thread request by updating the "Authenticated post" integration mapping in tests/integration/SPEC.md to match current frontend behavior: signed-in submission flow sends author fields (e.g., displayName and handle) in the POST body, and no separate name/handle prompt appears during submission.
+
+---
+
+PROMPT:
+Follow-up refinement after validation review.
+
+RESPONSE:
+Refined the "Authenticated post" expected-output wording in tests/integration/SPEC.md to keep implementation accuracy (client sends displayName/handle in signed-in flow) while emphasizing observable integration behavior (post renders with logged-in identity and no additional name/handle prompt).

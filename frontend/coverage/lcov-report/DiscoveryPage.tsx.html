@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>66/66</span>
+                <span class='fraction'>67/67</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>78/78</span>
+                <span class='fraction'>82/82</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>61/61</span>
+                <span class='fraction'>62/62</span>
             </div>
         
             
@@ -382,7 +382,16 @@
 <a name='L317'></a><a href='#L317'>317</a>
 <a name='L318'></a><a href='#L318'>318</a>
 <a name='L319'></a><a href='#L319'>319</a>
-<a name='L320'></a><a href='#L320'>320</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -426,6 +435,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">160x</span>
 <span class="cline-any cline-yes">160x</span>
 <span class="cline-any cline-yes">160x</span>
 <span class="cline-any cline-yes">160x</span>
@@ -644,6 +654,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -701,8 +712,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../context/AuthContext";
+import { API_BASE } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, BarChart3 } from "lucide-react";
 import { FilterBar } from "../components/FilterBar";
@@ -729,6 +743,7 @@ interface ArtistsResponse {
 type SortOption = "activity" | "recent";
 type DevState = "loading" | "error" | "empty";
 &nbsp;
+// Builds a URL query string, omitting falsy/empty values and expanding arrays
 export function buildParams(params: Record&lt;string, unknown&gt;): string {
   const sp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -746,6 +761,7 @@ const PER_PAGE = 12;
 &nbsp;
 export default function DiscoveryPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeDiscussions, setActiveDiscussions] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState&lt;string[]&gt;([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
@@ -765,7 +781,7 @@ export default function DiscoveryPage() {
   const { data, isLoading, isError, refetch } = useQuery&lt;ArtistsResponse&gt;({
     queryKey: ["artists", { activeDiscussions, selectedGenres, selectedTimeRange, sort, page }],
     queryFn: () =&gt;
-      fetch(`/api/artists?${queryParams}`).then((r) =&gt; {
+      fetch(`${API_BASE}/api/artists?${queryParams}`).then((r) =&gt; {
         if (!r.ok) throw new Error("Failed to fetch artists");
         return r.json();
       }),
@@ -954,7 +970,8 @@ export default function DiscoveryPage() {
       )}
 &nbsp;
       {/* Developer Controls */}
-      &lt;div className="mt-8 p-5 bg-[#252525] border border-[#333333]"&gt;
+      {(user?.isDeveloper || (typeof process !== "undefined" &amp;&amp; process.env.NODE_ENV === "test")) &amp;&amp; (
+        &lt;div className="mt-8 p-5 bg-[#252525] border border-[#333333]"&gt;
         &lt;h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2"&gt;
           &lt;span&gt;🛠&lt;/span&gt; Developer Controls
         &lt;/h3&gt;
@@ -1016,7 +1033,8 @@ export default function DiscoveryPage() {
             &lt;/Button&gt;
           )}
         &lt;/div&gt;
-      &lt;/div&gt;
+        &lt;/div&gt;
+      )}
     &lt;/div&gt;
   );
 }
@@ -1027,7 +1045,7 @@ export default function DiscoveryPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-05T19:00:45.828Z
+                at 2026-04-19T21:46:13.190Z
             </div>
         <script src="prettify.js"></script>
         <script>

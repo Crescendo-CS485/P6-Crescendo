@@ -60,6 +60,7 @@ class User(db.Model):
     handle = db.Column(db.String(100), unique=True, nullable=False)
     is_bot = db.Column(db.Boolean, default=False)
     bot_label = db.Column(db.String(100), nullable=True)
+    is_developer = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     email = db.Column(db.String(255), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=True)
@@ -71,6 +72,7 @@ class User(db.Model):
             "handle": self.handle,
             "isBot": self.is_bot,
             "botLabel": self.bot_label,
+            "isDeveloper": self.is_developer,
         }
 
     def to_dict_auth(self):

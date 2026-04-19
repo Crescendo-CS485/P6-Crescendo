@@ -8,6 +8,7 @@ import { CommentList } from "../components/CommentList";
 import { CommentBox } from "../components/CommentBox";
 import { AuthModal } from "../components/AuthModal";
 import { Button } from "../components/ui/button";
+import { useAuth } from "../context/AuthContext";
 
 interface PostsResponse {
   discussion: Discussion;
@@ -16,6 +17,7 @@ interface PostsResponse {
 type DevState = "loading" | "not-found";
 
 export default function DiscussionPage() {
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [authModal, setAuthModal] = useState(false);
   const [devState, setDevState] = useState<DevState | null>(null);
@@ -101,7 +103,8 @@ export default function DiscussionPage() {
       )}
 
       {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
+      {(user?.isDeveloper || (typeof process !== "undefined" && process.env.NODE_ENV === "test")) && (
+        <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
         <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
           <span>🛠</span> Developer Controls
         </h3>
@@ -143,7 +146,8 @@ export default function DiscussionPage() {
             Not Found State
           </Button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

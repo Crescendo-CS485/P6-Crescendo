@@ -13,7 +13,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["jest", "@testing-library/jest-dom"]
+    "types": ["node", "vite/client", "jest", "@testing-library/jest-dom"]
   },
   "include": ["src", "jest.setup.ts"]
 }

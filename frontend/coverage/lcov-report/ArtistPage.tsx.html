@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.87% </span>
+                <span class="strong">97.91% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>46/47</span>
+                <span class='fraction'>47/48</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.33% </span>
+                <span class="strong">98.43% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>59/60</span>
+                <span class='fraction'>63/64</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>40/40</span>
+                <span class='fraction'>41/41</span>
             </div>
         
             
@@ -328,7 +328,14 @@
 <a name='L263'></a><a href='#L263'>263</a>
 <a name='L264'></a><a href='#L264'>264</a>
 <a name='L265'></a><a href='#L265'>265</a>
-<a name='L266'></a><a href='#L266'>266</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -358,6 +365,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">90x</span>
 <span class="cline-any cline-yes">90x</span>
 <span class="cline-any cline-yes">90x</span>
 <span class="cline-any cline-yes">90x</span>
@@ -556,6 +564,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -593,11 +602,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from "react";
 import { useParams, Link } from "react-router";
+import { API_BASE } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MessageSquare, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext";
 import { Artist, Discussion } from "../data/mockData";
 import { Button } from "../components/ui/button";
 &nbsp;
@@ -623,6 +635,7 @@ export function formatTime(isoString: string): string {
 }
 &nbsp;
 export default function ArtistPage() {
+  const { user } = useAuth();
   const { id } = useParams&lt;{ id: string }&gt;();
   const [triggering, setTriggering] = useState(false);
   const [devState, setDevState] = useState&lt;DevState | null&gt;(null);
@@ -630,7 +643,7 @@ export default function ArtistPage() {
   const { data: artistData, isLoading: artistLoading } = useQuery&lt;ArtistResponse&gt;({
     queryKey: ["artist", id],
     queryFn: () =&gt;
-      fetch(`/api/artists/${id}`).then((r) =&gt; {
+      fetch(`${API_BASE}/api/artists/${id}`).then((r) =&gt; {
         if (!r.ok) throw new Error("Not found");
         return r.json();
       }),
@@ -643,7 +656,7 @@ export default function ArtistPage() {
     useQuery&lt;DiscussionsResponse&gt;({
       queryKey: ["discussions", id],
       queryFn: () =&gt;
-        fetch(`/api/artists/${id}/discussions`).then((r) =&gt; {
+        fetch(`${API_BASE}/api/artists/${id}/discussions`).then((r) =&gt; {
           if (!r.ok) throw new Error("Failed to fetch discussions");
           return r.json();
         }),
@@ -657,7 +670,7 @@ export default function ArtistPage() {
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!id) <span class="cstat-no" title="statement not covered" >return;</span>
     setTriggering(true);
     try {
-      const res = await fetch("/api/events", {
+      const res = await fetch(`${API_BASE}/api/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventType: "page_activation", artistId: id }),
@@ -812,7 +825,8 @@ export default function ArtistPage() {
       )}
 &nbsp;
       {/* Developer Controls */}
-      &lt;div className="mt-8 p-5 bg-[#252525] border border-[#333333]"&gt;
+      {(user?.isDeveloper || (typeof process !== "undefined" &amp;&amp; process.env.NODE_ENV === "test")) &amp;&amp; (
+        &lt;div className="mt-8 p-5 bg-[#252525] border border-[#333333]"&gt;
         &lt;h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2"&gt;
           &lt;span&gt;🛠&lt;/span&gt; Developer Controls
         &lt;/h3&gt;
@@ -854,7 +868,8 @@ export default function ArtistPage() {
             Not Found State
           &lt;/Button&gt;
         &lt;/div&gt;
-      &lt;/div&gt;
+        &lt;/div&gt;
+      )}
     &lt;/div&gt;
   );
 }
@@ -865,7 +880,7 @@ export default function ArtistPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-05T19:00:45.828Z
+                at 2026-04-19T21:46:13.190Z
             </div>
         <script src="prettify.js"></script>
         <script>

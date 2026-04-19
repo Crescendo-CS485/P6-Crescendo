@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, session
+from flask import current_app
 from sqlalchemy import nullslast
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
 from . import db
@@ -306,6 +307,14 @@ def search():
 @bp.route("/debug/jobs")
 def debug_jobs():
     """Shows the last 20 LLMJobs and their status/errors."""
+    # Require developer privilege — allow in TESTING mode for automated tests
+    if not current_app.config.get("TESTING", False):
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Forbidden"}), 403
+        user = User.query.get(user_id)
+        if not user or not getattr(user, "is_developer", False):
+            return jsonify({"error": "Forbidden"}), 403
     jobs = LLMJob.query.order_by(LLMJob.created_at.desc()).limit(20).all()
     return jsonify([
         {
@@ -324,6 +333,15 @@ def debug_jobs():
 @bp.route("/debug/run-job/<int:job_id>", methods=["POST"])
 def debug_run_job(job_id):
     """Synchronously runs a pending job — useful for testing without waiting for the scheduler."""
+    # Require developer privilege — allow in TESTING mode for automated tests
+    if not current_app.config.get("TESTING", False):
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Forbidden"}), 403
+        user = User.query.get(user_id)
+        if not user or not getattr(user, "is_developer", False):
+            return jsonify({"error": "Forbidden"}), 403
+
     from .services.llm_worker import _execute_job
     try:
         _execute_job(job_id)

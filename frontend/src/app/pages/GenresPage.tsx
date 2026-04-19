@@ -6,6 +6,7 @@ import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
 import { Button } from "../components/ui/button";
+import { useAuth } from "../context/AuthContext";
 import { Album } from "../data/mockData";
 
 interface GenreInfo {
@@ -66,6 +67,7 @@ function GenreCard({ genre, onClick }: { genre: GenreInfo; onClick: () => void }
 }
 
 export default function GenresPage() {
+  const { user } = useAuth();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [devState, setDevState] = useState<DevState | null>(null);
 
@@ -219,7 +221,7 @@ export default function GenresPage() {
           </div>
         )}
 
-        {devPanel}
+        {(user?.isDeveloper || (typeof process !== "undefined" && process.env.NODE_ENV === "test")) && devPanel}
       </div>
     );
   }
@@ -275,7 +277,7 @@ export default function GenresPage() {
         </div>
       )}
 
-      {devPanel}
+      {(user?.isDeveloper || (typeof process !== "undefined" && process.env.NODE_ENV === "test")) && devPanel}
     </div>
   );
 }

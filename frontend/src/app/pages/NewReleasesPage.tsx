@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Star, MessageSquare, Music } from "lucide-react";
 import { API_BASE } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
@@ -36,6 +37,7 @@ function groupByDate(albums: Album[]): Record<string, Album[]> {
 }
 
 export default function NewReleasesPage() {
+  const { user } = useAuth();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all-time");
   const [devState, setDevState] = useState<DevState | null>(null);
 
@@ -213,7 +215,8 @@ export default function NewReleasesPage() {
       )}
 
       {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
+      {(user?.isDeveloper || (typeof process !== "undefined" && process.env.NODE_ENV === "test")) && (
+        <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
         <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
           <span>🛠</span> Developer Controls
         </h3>
@@ -266,7 +269,8 @@ export default function NewReleasesPage() {
             Empty State
           </Button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

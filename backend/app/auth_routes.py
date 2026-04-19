@@ -35,6 +35,7 @@ def register():
         email=email,
         password_hash=generate_password_hash(password),
         is_bot=False,
+        is_developer=False,
     )
     db.session.add(user)
     db.session.commit()

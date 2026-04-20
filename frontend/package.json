@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "lint": "eslint src --ext .ts,.tsx",
     "test": "jest --config jest.config.cjs",
     "test:integration": "playwright test --config playwright.config.ts",
     "test:integration:deployed": "BASE_URL=https://main.d291kg32gzfrfc.amplifyapp.com playwright test --config playwright.config.ts"
@@ -40,8 +41,13 @@
     "@types/jest": "^30.0.0",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
     "@vitejs/plugin-react": "4.7.0",
     "babel-jest": "^30.3.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "4.1.12",

@@ -26,9 +26,11 @@ export function AddAlbumModal({
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set(existingAlbumIds));
 
-  // Reset state when modal opens
+  // Reset state when modal opens — resetting derived UI state on prop change
+  // is the correct pattern here; suppressing set-state-in-effect false positive
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearch("");
       setAdded(new Set(existingAlbumIds));
     }

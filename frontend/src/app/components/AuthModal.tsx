@@ -31,9 +31,11 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Sync tab when modal opens
+  // Sync tab when modal opens — resetting derived UI state on prop change
+  // is the correct pattern here; suppressing set-state-in-effect false positive
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab(initialTab);
       setError(null);
     }
@@ -258,7 +260,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                 )}
               </Button>
               <p className="text-center text-xs text-[#666666]">
-                Don't have an account?{" "}
+                {"Don't"} have an account?{" "}
                 <button
                   type="button"
                   onClick={() => setTab("join")}

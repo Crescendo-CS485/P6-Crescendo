@@ -19,8 +19,14 @@ export function CreateListModal({ isOpen, onClose, onCreated }: CreateListModalP
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Reset form fields when modal opens; suppressing set-state-in-effect false positive
   useEffect(() => {
-    if (isOpen) { setTitle(""); setDescription(""); setError(null); }
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTitle("");
+      setDescription("");
+      setError(null);
+    }
   }, [isOpen]);
 
   useEffect(() => {

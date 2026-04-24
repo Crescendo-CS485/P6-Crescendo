@@ -112,3 +112,43 @@ RESPONSE:
 Appended all Part 8 session exchanges to chatlog.txt and pushed to main.
 
 ---
+
+---
+
+PROMPT:
+You have been given comments on the previous commits you made in the repository.
+
+RESPONSE:
+Applied PR review feedback in tests/integration/SPEC.md by replacing tab-indented list continuations with spaces, correcting User Lists scope wording (list creation/retrieval + add/remove albums), aligning the "Sort by Most Recent" expectation with backend behavior (discussion count), adding required `{ albumId }` request body for add-to-list, and fixing tab indentation in Environment Notes.
+
+---
+
+PROMPT:
+You have been given comments on the previous commits you made in the repository.
+
+RESPONSE:
+Applied the second PR review thread updates to tests/integration/SPEC.md to match current implementation: moved stats mapping from Discovery to Community (`GET /api/stats` sidebar), updated trigger action to Artist page "Trigger LLM Activity", corrected New Releases request sequence (initial sort by release date + upcoming refetch), corrected Genres card behavior (in-place `/genres` fetch), and revised posting requirements to signed-in flow. Also updated Functional Scope bullets accordingly.
+
+---
+
+PROMPT:
+You have been given comments on the previous commits you made in the repository.
+
+RESPONSE:
+Applied the latest review thread updates to tests/integration/SPEC.md by softening the opening paragraph to describe covered pathways (not every pathway) and updating the Trigger event row to include the required `eventType` field alongside `artistId` for `POST /api/events` (e.g., `page_activation`).
+
+---
+
+PROMPT:
+You have been given comments on the previous commits you made in the repository.
+
+RESPONSE:
+Applied the latest review-thread request by updating the "Authenticated post" integration mapping in tests/integration/SPEC.md to match current frontend behavior: signed-in submission flow sends author fields (e.g., displayName and handle) in the POST body, and no separate name/handle prompt appears during submission.
+
+---
+
+PROMPT:
+Follow-up refinement after validation review.
+
+RESPONSE:
+Refined the "Authenticated post" expected-output wording in tests/integration/SPEC.md to keep implementation accuracy (client sends displayName/handle in signed-in flow) while emphasizing observable integration behavior (post renders with logged-in identity and no additional name/handle prompt).

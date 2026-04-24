@@ -1,190 +1,65 @@
 # Crescendo Integration Test Specification
 
-This document describes every code pathway that requires the execution of **both** frontend
-and backend code together. Each pathway is listed as a plain-English sentence that a test
-must verify.
+This document describes the integration pathways covered by this specification where frontend and
+backend code execute together. Each included pathway is listed as a plain-English requirement
+followed by a technical test mapping.
 
----
+## 1. Functional Scope
 
-## 1. Discovery Page — Artist Feed
+The following features are subject to integration testing to verify end-to-end data integrity and
+UI state management:
 
-**1.1 Load default artist list**
-When the user opens the Discovery page, the frontend calls `GET /api/artists` and renders
-the returned artist cards (name, image, genre tags) on screen.
+- Discovery and Filtering: Verified via the Artist Feed filters and sort controls.
+- Artist and Discussions: Verified through profile loading, discussion browsing, and authenticated
+  post submissions.
+- Authentication: Verified via registration, login validation, and session persistence across
+  navigation.
+- Content Discovery: Verified through the Best Albums, New Releases, and Genres pages.
+- User Lists: Verified via list creation, list retrieval, and adding/removing albums for personal
+  album collections.
+- Global Search: Verified through debounced API queries and result navigation.
+- Community Overview: Verified via discussion feed loading and community stats retrieval.
 
-**1.2 Filter by genre**
-When the user clicks a genre chip, the frontend appends `?genre=<name>` to the artists
-request and only the matching artists are displayed.
+## 2. Integration Test Table
 
-**1.3 Filter by "Active Discussions"**
-When the user toggles "Active Discussions", the frontend appends `?active_discussions=true`
-and only artists whose activity score ≥ 8.5 are shown.
+| Purpose | Test Inputs (Frontend Action) | Expected Output (Backend/UI Result) |
+|---|---|---|
+| Load default artist list | Open Discovery page; calls `GET /api/artists`. | Status 200; Artist cards (name, image, genre) render on screen. |
+| Filter by genre | Click genre chip; appends `?genre=<name>` to request. | UI displays only artists matching the selected genre. |
+| Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
+| Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
+| Community stats panel | Open Community page; calls `GET /api/stats` (alongside discussions fetch). | Sidebar displays Active Artists and Community Members from the stats response. |
+| Trigger event | On the Artist page, click `Trigger LLM Activity`; `POST /api/events` with `artistId` and required `eventType` (for example, `page_activation`). | Status 200; a success toast notification appears in the UI. |
+| Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
+| Load discussion list | Artist page mount; calls `GET /api/artists/<id>/discussions`. | List of discussion threads renders beneath the profile. |
+| Open thread and load posts | Click discussion card; calls `GET /api/discussions/<id>/posts`. | Post bodies render in chronological order. |
+| Submit post (requires sign-in) | While signed in, input post body and submit `POST /api/discussions/<id>/posts`. | Signed-out users are prompted to sign in; signed-in submissions appear without a page reload. |
+| Register new account | Submit Join form; `POST /api/auth/register`. | Success: display name appears in header; modal closes. |
+| Sign in (valid) | Submit Sign In form; `POST /api/auth/login`. | Success: display name appears in header; session cookie set. |
+| Sign in (invalid) | Submit Sign In form with incorrect password. | 401 response; error message displayed in the login modal. |
+| Session persistence | Sign in and then navigate to a different page. | `GET /api/auth/me` on mount restores the user's session in the header. |
+| Sign out | Click Sign out; calls `POST /api/auth/logout`. | Header reverts to Sign In / Join guest state. |
+| Authenticated post | Submit post while logged in. | `POST /api/discussions/<id>/posts` follows the signed-in client flow (including author fields like `displayName` and `handle` in the request body); the new post appears with the logged-in identity, and no separate prompt for display name/handle appears during submission. |
+| Default album list | Open Best Albums; calls `GET /api/albums`. | Album cards render with title, artist, and user scores. |
+| Filter by year | Select year (e.g., 2026); `GET /api/albums?time_range=2026`. | UI displays only albums released in the specified year. |
+| Sort by critic score | Switch sort; re-fetches with `?sort=critic_score`. | Album order matches the backend critic score ranking. |
+| Upcoming releases | Open New Releases; initial request is `GET /api/albums?sort=release_date&per_page=50`, then selecting Upcoming re-fetches with `time_range=upcoming`. | Initial UI shows releases sorted by release date; Upcoming filter limits results to albums with future release dates. |
+| Genre grid load | Open Genres page; calls `GET /api/albums/genres`. | Cards render for each genre with count and average score. |
+| Genre card navigation | Click genre card on `/genres`; calls `GET /api/albums?genre=<name>&sort=user_score&per_page=50` without leaving the page. | Genres page updates in place to show the filtered album list for the selected genre. |
+| Lists index load | Open Lists page; calls `GET /api/lists`. | All user-created album lists are rendered. |
+| Create new list | Logged in; `POST /api/lists` with `{ title, description }`. | New list appears in the index immediately. |
+| Add album to list | Open Add modal; `POST /api/lists/<id>/albums` with `{ albumId }`. | Selected album appears in the list detail view. |
+| Remove album from list | Click remove; `DELETE /api/lists/<id>/albums/<album_id>`. | Album is removed from the list detail view. |
+| Search (valid) | Type 2+ chars; `GET /api/search?q=<query>` (debounced). | Dropdown displays matching artists and albums. |
+| Search navigation | Click a search result (Artist or Album). | UI navigates to the appropriate Artist page. |
+| Search (short query) | Type < 2 characters in the search bar. | No network request is sent; dropdown remains closed. |
 
-**1.4 Sort by "Most Recent"**
-Switching the sort control to "Most Recent" re-fetches artists sorted by discussion count
-descending and the first card changes accordingly.
+## 3. Environment Notes
 
-**1.5 Stats banner**
-The Discovery page also calls `GET /api/stats` and the returned counts (artists, discussions,
-posts) appear in the statistics strip at the top of the page.
-
-**1.6 Trigger event from Discovery page**
-Clicking the "Trending" trigger button on an artist card fires `POST /api/events` with the
-artist ID and event type; a 200 response causes a success toast to appear.
-
----
-
-## 2. Artist Page — Profile & Discussions
-
-**2.1 Load artist profile**
-Navigating to `/artists/<id>` causes the frontend to call `GET /api/artists/<id>` and
-render the artist name, image, genre tags, and biography.
-
-**2.2 Load discussion list**
-After loading the artist profile, the page calls `GET /api/artists/<id>/discussions` and
-renders the list of discussion threads beneath the profile.
-
-**2.3 Open a discussion thread and load posts**
-Clicking a discussion card calls `GET /api/discussions/<id>/posts` and renders the post
-bodies in chronological order.
-
-**2.4 Submit a new post (anonymous)**
-When the user types a comment in the text area and clicks "Post", the frontend sends
-`POST /api/discussions/<id>/posts` with `{ body, displayName, handle }`. The new post
-appears in the thread immediately without a page reload.
-
----
-
-## 3. Authentication
-
-**3.1 Register a new account**
-Submitting the Join form calls `POST /api/auth/register`; on success the user's display
-name appears in the header and the modal closes.
-
-**3.2 Sign in with valid credentials**
-Submitting the Sign In form calls `POST /api/auth/login`; on success the user's display
-name appears in the header.
-
-**3.3 Sign in with wrong password returns error**
-Submitting the Sign In form with an incorrect password receives a 401 from
-`POST /api/auth/login` and an error message is displayed in the modal.
-
-**3.4 Session persists after navigation**
-After signing in, navigating to another page still shows the user's display name (the
-frontend calls `GET /api/auth/me` on mount and restores the session).
-
-**3.5 Sign out**
-Clicking "Sign out" calls `POST /api/auth/logout`; the header reverts to the "Sign In /
-Join" buttons.
-
-**3.6 Authenticated post uses session user**
-After signing in, posting a comment in a discussion thread does not prompt for a display
-name or handle — the backend uses the server-side session to identify the author.
-
----
-
-## 4. Best Albums Page
-
-**4.1 Default album list**
-The Best Albums page calls `GET /api/albums` and renders album cards with title, artist,
-and user score.
-
-**4.2 Filter by year**
-Selecting a year filter (e.g. "2026") re-fetches with `?time_range=2026` and only albums
-from that release year are shown.
-
-**4.3 Filter by genre**
-Selecting a genre filter appends `?genre=<name>` and only albums of that genre appear.
-
-**4.4 Sort by critic score**
-Switching to "Critic Score" re-fetches with `?sort=critic_score`; the album order
-matches the backend's critic score ranking.
-
----
-
-## 5. New Releases Page
-
-**5.1 Upcoming releases**
-The New Releases page calls `GET /api/albums?time_range=upcoming` (or similar) and
-shows albums whose release date is in the future.
-
-**5.2 Recent releases this week**
-Filtering to "This Week" re-fetches with `?time_range=this-week` and only albums
-released in the past 7 days appear.
-
----
-
-## 6. Genres Page
-
-**6.1 Genre grid loads**
-The Genres page calls `GET /api/albums/genres` and renders a card for each genre with
-the album count and average score.
-
-**6.2 Genre card links to filtered Best Albums**
-Clicking a genre card navigates to the Best Albums page pre-filtered to that genre and
-the artist/album count reflects the filter.
-
----
-
-## 7. Community (Discussions) Page
-
-**7.1 All discussions load**
-The Community page calls `GET /api/discussions` and renders the most-recently-active
-threads across all artists.
-
-**7.2 Sort by popularity**
-Switching to "Popular" re-fetches with `?sort=popular` and the first thread has the
-highest post count.
-
----
-
-## 8. Lists Page
-
-**8.1 Lists index loads**
-The Lists page calls `GET /api/lists` and renders all user-created album lists.
-
-**8.2 Open a list and see its albums**
-Clicking a list card navigates to `/lists/<id>`, which calls `GET /api/lists/<id>` and
-renders the albums in that list.
-
-**8.3 Create a new list (requires auth)**
-When logged in, submitting the "Create List" modal calls `POST /api/lists` with `{ title,
-description }` and the new list appears in the index immediately.
-
-**8.4 Add an album to a list**
-Opening the "Add Album" modal, searching for an album, and confirming calls
-`POST /api/lists/<id>/albums`; the album appears in the list detail view.
-
-**8.5 Remove an album from a list**
-Clicking the remove button next to an album in the list detail view calls
-`DELETE /api/lists/<id>/albums/<album_id>` and the album disappears from the list.
-
----
-
-## 9. Search
-
-**9.1 Search returns artists and albums**
-Typing at least 2 characters in the search bar triggers `GET /api/search?q=<query>`
-(debounced 300 ms) and the dropdown shows matching artists and albums.
-
-**9.2 Clicking a search result navigates to the correct page**
-Clicking an artist result navigates to `/artists/<id>`; clicking an album result also
-navigates to the artist page for that album's artist.
-
-**9.3 Short queries (< 2 chars) are not sent**
-Typing a single character produces no network request to `/api/search` and the dropdown
-stays closed.
-
----
-
-## Environment Notes
-
-Tests marked **[LOCAL ONLY]** require both the Vite dev server (`npm run dev`) and the
-Flask server (`python run.py`) running locally.
-
-Tests marked **[DEPLOYED]** verify the same pathways against the live AWS infrastructure:
-- Frontend: `https://main.d291kg32gzfrfc.amplifyapp.com`
-- Backend: `https://ue039qft5b.execute-api.us-east-1.amazonaws.com/prod`
-
-All other tests can run in both environments by switching the `BASE_URL` environment
-variable.
+- Local Testing: Requires the Vite development server (`npm run dev`) and the Flask server
+  (`python run.py`) running simultaneously.
+- Deployed Testing: Verified against live AWS infrastructure:
+  - Frontend: `https://main.d291kg32gzfrfc.amplifyapp.com`
+  - Backend: `https://ue039qft5b.execute-api.us-east-1.amazonaws.com/prod`
+- Environment Switching: Tests are configured to toggle between environments using the
+  `BASE_URL` environment variable.

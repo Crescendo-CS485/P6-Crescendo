@@ -224,3 +224,11 @@ now that we have a working product, let's add more albums. 500 should work.
 
 RESPONSE:
 Extended `backend/app/seed.py` with `_ensure_catalog_albums()` (target 500, idempotent): after curated `_seed_albums()`, pads with synthetic "Crescendo Catalog #NNNNN" titles on rotating seeded artists, varied years/scores/types, `cover_url=None` so artist image fallback applies. Re-ran pytest (86 passed). Restart the backend so `seed()` runs and tops up existing DBs toward 500 albums.
+
+---
+
+PROMPT:
+can we add some recent albums so 2026 and every premade filter has something to show.
+
+RESPONSE:
+Added `_ensure_spotlight_albums()` in `seed.py`: idempotent "Spotlight — …" rows for New Releases (`today`, `this-week`, `this-month`, `upcoming`), Best Albums year pills (`2024`–`2026`), and one 2026 album per genre matching the Best Albums chip list (incl. Rock, Country, Blues, Dance). Catalog random `release_year` now includes 2026. Restart backend once so seed inserts any missing spotlight rows.

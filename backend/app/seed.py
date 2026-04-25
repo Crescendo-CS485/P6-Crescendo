@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from . import db
 from .models import Artist, Genre, User, LLMPersona, Discussion, Post, Album, List, ListAlbum
 
@@ -276,6 +276,7 @@ def seed():
     _seed_bots_and_discussions()
     _seed_albums()
     _ensure_catalog_albums()
+    _ensure_spotlight_albums()
     _seed_lists()
 
 
@@ -1085,7 +1086,7 @@ def _ensure_catalog_albums():
     for i in range(needed):
         seq = current + i + 1
         artist = artists[i % len(artists)]
-        year = rng.randint(1995, 2025)
+        year = rng.randint(1995, 2026)
         release_date = date(year, rng.randint(1, 12), rng.randint(1, 28))
         base = 6.4 + rng.random() * 2.9
         user_score = round(min(9.9, base + rng.random() * 0.45), 1)
@@ -1114,6 +1115,129 @@ def _ensure_catalog_albums():
 
     db.session.commit()
     print(f"Added {needed} catalog albums (target total {CATALOG_ALBUM_TARGET}).")
+
+
+# Mirrors `genres` in frontend/src/app/data/mockData.ts (Best Albums filter chips).
+SPOTLIGHT_FILTER_GENRES = [
+    "Rock",
+    "Hip Hop",
+    "Jazz",
+    "Electronic",
+    "Pop",
+    "Country",
+    "Indie",
+    "Blues",
+    "Folk",
+    "Dance",
+    "Alternative",
+]
+
+
+def _ensure_spotlight_albums():
+    """Idempotent demo rows so New Releases / Best Albums filters always return hits."""
+    artists = Artist.query.all()
+    if not artists:
+        return
+
+    def get_or_create_genre(name: str) -> Genre:
+        g = Genre.query.filter_by(name=name).first()
+        if not g:
+            g = Genre(name=name)
+            db.session.add(g)
+            db.session.flush()
+        return g
+
+    today = date.today()
+    n_art = len(artists)
+
+    # (title, release_date, genre_names, user_score, critic_score or None)
+    rows = [
+        ("Spotlight — Out Today", today, ["Pop", "Electronic"], 8.4, 8.2),
+        (
+            "Spotlight — Dropped This Week",
+            today - timedelta(days=4),
+            ["Indie", "Alternative"],
+            8.1,
+            8.0,
+        ),
+        (
+            "Spotlight — Earlier This Month",
+            today - timedelta(days=18),
+            ["R&B", "Electronic"],
+            8.3,
+            8.1,
+        ),
+        (
+            "Spotlight — Due Next Week",
+            today + timedelta(days=5),
+            ["Hip Hop"],
+            7.9,
+            7.8,
+        ),
+        (
+            "Spotlight — Upcoming Deluxe",
+            today + timedelta(days=28),
+            ["Pop"],
+            8.0,
+            None,
+        ),
+        (
+            "Spotlight — 2025 Retrospective",
+            date(2025, 8, 1),
+            ["Jazz", "Electronic"],
+            8.5,
+            8.6,
+        ),
+        (
+            "Spotlight — 2024 Late Arrival",
+            date(2024, 12, 5),
+            ["Rock", "Alternative"],
+            8.2,
+            8.0,
+        ),
+    ]
+
+    for j, gname in enumerate(SPOTLIGHT_FILTER_GENRES):
+        day = 1 + (j % 28)
+        rows.append(
+            (
+                f"Spotlight — 2026 {gname}",
+                date(2026, 4, day),
+                [gname],
+                round(7.5 + (j % 5) * 0.3, 1),
+                round(7.4 + (j % 5) * 0.3, 1),
+            )
+        )
+
+    added = 0
+    for i, (title, rd, genre_names, user_score, critic_score) in enumerate(rows):
+        if Album.query.filter_by(title=title).first():
+            continue
+        artist = artists[i % n_art]
+        album = Album(
+            title=title,
+            artist_id=artist.id,
+            cover_url=None,
+            release_date=rd,
+            release_year=rd.year,
+            user_score=user_score,
+            critic_score=critic_score,
+            review_count=220 + i * 41,
+            discussion_count=18 + i * 4,
+            list_appearances=4 + (i % 20),
+            album_type="live" if i % 9 == 0 else "studio",
+        )
+        db.session.add(album)
+        db.session.flush()
+        for gn in genre_names:
+            album.genres.append(get_or_create_genre(gn))
+        added += 1
+
+    if added:
+        db.session.commit()
+        print(f"Added {added} spotlight demo albums for time/year/genre filters.")
+    else:
+        print("Spotlight demo albums already present, skipping.")
 
 
 def _seed_lists():

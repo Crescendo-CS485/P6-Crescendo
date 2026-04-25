@@ -7,18 +7,14 @@ import { Discussion } from "../data/mockData";
 import { CommentList } from "../components/CommentList";
 import { CommentBox } from "../components/CommentBox";
 import { AuthModal } from "../components/AuthModal";
-import { Button } from "../components/ui/button";
 
 interface PostsResponse {
   discussion: Discussion;
 }
 
-type DevState = "loading" | "not-found";
-
 export default function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
   const [authModal, setAuthModal] = useState(false);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const { data, isLoading, isError } = useQuery<PostsResponse>({
     queryKey: ["discussion-meta", id],
@@ -32,10 +28,8 @@ export default function DiscussionPage() {
 
   const discussion = data?.discussion;
 
-  const showLoading = devState === "loading" || (devState === null && isLoading);
-  const showNotFound =
-    devState === "not-found" ||
-    (devState === null && (isError || (!isLoading && !discussion)));
+  const showLoading = isLoading;
+  const showNotFound = isError || (!isLoading && !discussion);
   const showContent = !showLoading && !showNotFound;
 
   return (
@@ -100,50 +94,6 @@ export default function DiscussionPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live
-          </Button>
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState("not-found")}
-            variant={devState === "not-found" ? "default" : "outline"}
-            className={
-              devState === "not-found"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Not Found State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

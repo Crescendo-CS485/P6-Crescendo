@@ -39,7 +39,7 @@ def create_app(test_config=None):
     from .list_routes import list_bp
     app.register_blueprint(list_bp)
 
-    if app.config.get("ENABLE_DEBUG_ROUTES"):
+    if app.config.get("ENABLE_DEBUG_ROUTES") and not _IS_LAMBDA:
         from .debug_routes import debug_bp
         app.register_blueprint(debug_bp)
 

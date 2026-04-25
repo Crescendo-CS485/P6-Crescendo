@@ -275,59 +275,6 @@ describe("ArtistPage", () => {
     });
   });
 
-  // 40
-  test('developer control "Loading State" forces loading UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Loading State" }));
-
-    expect(screen.getByText("Loading artist...")).toBeInTheDocument();
-    expect(screen.queryByText(artist.name)).not.toBeInTheDocument();
-  });
-
-  // 41
-  test('developer control "Not Found State" forces not-found UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Not Found State" }));
-
-    expect(screen.getByText("Artist not found.")).toBeInTheDocument();
-    expect(screen.queryByText(artist.name)).not.toBeInTheDocument();
-  });
-
-  // 42
-  test('developer control "Live" restores actual query-driven UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Loading State" }));
-    expect(screen.getByText("Loading artist...")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Live" }));
-
-    expect(screen.queryByText("Loading artist...")).not.toBeInTheDocument();
-    expect(screen.getByText(artist.name)).toBeInTheDocument();
-  });
 });
 
 // ---------------------------------------------------------------------------

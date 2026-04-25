@@ -176,3 +176,27 @@ okay let's do it
 
 RESPONSE:
 Implemented production-hardening: gated `/api/debug/*` behind ENABLE_DEBUG_ROUTES (default off; tests set env); CORS_ORIGINS + credentialed CORS when set; SESSION_COOKIE_SECURE and SESSION_COOKIE_SAMESITE in config; POST /api/events and POST /api/discussions/.../posts require session; list create/add/remove require auth and owner match; moved debug routes to debug_routes.py; frontend apiFetch(..., { credentials: include }) site-wide, CommentBox body-only, ArtistPage trigger requires sign-in; Jest apiMock exports apiFetch; added pytest-cov; tests and SPEC.md updated.
+
+---
+
+PROMPT:
+okay let's work on the polish, review the app and see what is not needed for production.
+
+RESPONSE:
+Reviewed production polish opportunities and identified dev-only elements to remove/tighten (Artist page Developer Controls UI, debug-route hard-disable in Lambda, auth state localStorage fallback, generated coverage artifacts in repo, and runtime docs hygiene).
+
+---
+
+PROMPT:
+let's do it.
+
+RESPONSE:
+Applied production polish cleanup: removed ArtistPage Developer Controls and related tests; hard-disabled debug blueprint registration when running in Lambda even if ENABLE_DEBUG_ROUTES is set; simplified AuthContext to server-session authority (removed localStorage user cache fallback); added ignores for frontend coverage and local backend artifacts (.coverage/sqlite); removed tracked frontend/coverage files; added concise Production Runtime Notes in README; re-ran backend and frontend tests successfully.
+
+---
+
+PROMPT:
+I still see the dev tools in the local running?
+
+RESPONSE:
+Confirmed Developer Controls were still present on multiple pages beyond ArtistPage (Discovery, Discussion, Community, Lists, Genres, NewReleases, BestAlbums). Removed all remaining Developer Controls/UI state overrides across those pages, updated related tests, and verified frontend test suite passes. If dev server still shows old UI, refresh/restart Vite to clear stale HMR state.

@@ -23,6 +23,17 @@ Open that URL in any modern browser. From there you can:
 
 ---
 
+## Production Runtime Notes
+
+- Debug API routes (`/api/debug/*`) are disabled by default and are never registered when running on AWS Lambda.
+- Session-backed auth requires cross-site cookie settings when frontend and API are on different domains:
+  - `SESSION_COOKIE_SECURE=true`
+  - `SESSION_COOKIE_SAMESITE=None`
+  - `CORS_ORIGINS=https://<your-frontend-domain>`
+- The production frontend should set `VITE_API_BASE` to the deployed API URL.
+
+---
+
 ## Running Tests Locally
 
 ### Backend Tests
@@ -52,10 +63,7 @@ source .venv/bin/activate        # macOS / Linux
 # 2. Install all dependencies (includes pytest and pytest-mock)
 pip install -r requirements.txt
 
-# 3. Install the coverage plugin
-pip install pytest-cov
-
-# 4. Run the tests with coverage
+# 3. Run the tests with coverage
 python -m pytest ../tests/ -v --cov=app.models --cov=app.routes --cov-report=term-missing
 ```
 
@@ -68,7 +76,7 @@ npm test        # runs pytest with coverage
 
 **What you should see:**
 
-- 84 tests passing (25 model tests + 59 route tests)
+- 86 tests passing
 - `models.py` at 100% coverage
 - `routes.py` at 96% coverage
 

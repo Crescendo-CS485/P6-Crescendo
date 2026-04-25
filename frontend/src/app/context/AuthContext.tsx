@@ -18,54 +18,25 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-const STORAGE_KEY = "crescendo_user";
-
-function loadStoredUser(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistUser(user: AuthUser | null) {
-  if (user) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-}
-
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialise from localStorage so the UI survives refresh; GET /api/auth/me reconciles with the server.
-  const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Reconcile with Flask session (requires apiFetch credentials: "include").
     apiFetch(`${API_BASE}/api/auth/me`)
       .then((r) => r.json())
       .then((data) => {
         if (data.user) {
-          // Real session exists — use it as the source of truth
           setUser(data.user);
-          persistUser(data.user);
         } else {
           setUser(null);
-          persistUser(null);
         }
       })
-      .catch(() => {/* network error — keep stored user */})
+      .catch(() => setUser(null))
       .finally(() => setIsLoading(false));
   }, []);
-
-  function setAndPersist(u: AuthUser | null) {
-    setUser(u);
-    persistUser(u);
-  }
 
   async function register(displayName: string, handle: string, email: string, password: string) {
     const res = await apiFetch(`${API_BASE}/api/auth/register`, {
@@ -75,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Registration failed");
-    setAndPersist(data.user);
+    setUser(data.user);
   }
 
   async function login(email: string, password: string) {
@@ -86,12 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Login failed");
-    setAndPersist(data.user);
+    setUser(data.user);
   }
 
   async function logout() {
     await apiFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
-    setAndPersist(null);
+    setUser(null);
   }
 
   return (

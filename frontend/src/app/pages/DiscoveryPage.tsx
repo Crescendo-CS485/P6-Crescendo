@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, BarChart3 } from "lucide-react";
@@ -25,7 +24,6 @@ interface ArtistsResponse {
 }
 
 type SortOption = "activity" | "recent";
-type DevState = "loading" | "error" | "empty";
 
 // Builds a URL query string, omitting falsy/empty values and expanding arrays
 export function buildParams(params: Record<string, unknown>): string {
@@ -44,13 +42,11 @@ export function buildParams(params: Record<string, unknown>): string {
 const PER_PAGE = 12;
 
 export default function DiscoveryPage() {
-  const navigate = useNavigate();
   const [activeDiscussions, setActiveDiscussions] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
   const [sort, setSort] = useState<SortOption>("activity");
   const [page, setPage] = useState(1);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const queryParams = buildParams({
     active_discussions: activeDiscussions || undefined,
@@ -73,13 +69,9 @@ export default function DiscoveryPage() {
   const artists = data?.artists ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.pages ?? 0;
-  const firstArtistId = data?.artists[0]?.id;
-
-  const effectiveLoading = devState === "loading" || (devState === null && isLoading);
-  const effectiveError = devState === "error" || (devState === null && isError);
-  const effectiveEmpty =
-    devState === "empty" ||
-    (devState === null && !isLoading && !isError && artists.length === 0);
+  const effectiveLoading = isLoading;
+  const effectiveError = isError;
+  const effectiveEmpty = !isLoading && !isError && artists.length === 0;
   const effectiveSuccess = !effectiveLoading && !effectiveError && !effectiveEmpty;
 
   const handleReset = () => {
@@ -88,7 +80,6 @@ export default function DiscoveryPage() {
     setSelectedTimeRange("all");
     setSort("activity");
     setPage(1);
-    setDevState(null);
   };
 
   return (
@@ -252,70 +243,6 @@ export default function DiscoveryPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live (Success)
-          </Button>
-          <Button
-            onClick={() => setDevState("error")}
-            variant={devState === "error" ? "default" : "outline"}
-            className={
-              devState === "error"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Error State
-          </Button>
-          <Button
-            onClick={() => setDevState("empty")}
-            variant={devState === "empty" ? "default" : "outline"}
-            className={
-              devState === "empty"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Empty State
-          </Button>
-          {firstArtistId && (
-            <Button
-              onClick={() => navigate(`/artists/${firstArtistId}`)}
-              variant="outline"
-              className="border-[#7c3aed] text-[#7c3aed] hover:bg-[#7c3aed] hover:text-white rounded-sm h-7 text-xs"
-            >
-              Go to Artist →
-            </Button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

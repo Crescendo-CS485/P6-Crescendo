@@ -8,6 +8,7 @@ interface AlbumCardProps {
 
 export function AlbumCard({ album }: AlbumCardProps) {
   const isHighScore = album.userScore >= 9.0;
+  const displayCover = album.coverUrl || album.artistImage;
 
   return (
     <Link
@@ -16,9 +17,9 @@ export function AlbumCard({ album }: AlbumCardProps) {
     >
       {/* Cover Art */}
       <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-        {album.coverUrl ? (
+        {displayCover ? (
           <img
-            src={album.coverUrl}
+            src={displayCover}
             alt={album.title}
             className="w-full h-full object-cover"
           />

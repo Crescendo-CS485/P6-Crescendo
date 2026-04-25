@@ -130,7 +130,7 @@ export function AddAlbumModal({
               >
                 {/* Cover */}
                 <img
-                  src={album.coverUrl}
+                  src={album.coverUrl || album.artistImage}
                   alt={album.title}
                   className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
                 />

@@ -38,6 +38,7 @@ const PER_PAGE = 12;
 
 // Inline list-view row component
 function AlbumRow({ album, rank }: { album: Album; rank: number }) {
+  const displayCover = album.coverUrl || album.artistImage;
   return (
     <Link
       to={`/artists/${album.artistId}`}
@@ -47,7 +48,7 @@ function AlbumRow({ album, rank }: { album: Album; rank: number }) {
         {rank}
       </span>
       <img
-        src={album.coverUrl}
+        src={displayCover}
         alt={album.title}
         className="w-12 h-12 object-cover flex-shrink-0"
       />

@@ -45,6 +45,7 @@ export interface Album {
   artistId: string;
   artistName: string;
   coverUrl: string;
+  artistImage?: string;
   releaseDate: string;
   releaseYear: number;
   userScore: number;

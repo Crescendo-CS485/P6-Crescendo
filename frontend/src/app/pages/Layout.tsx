@@ -126,7 +126,11 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.coverUrl} alt={a.title} className="w-8 h-8 object-cover flex-shrink-0" />
+                            <img
+                              src={a.coverUrl || a.artistImage}
+                              alt={a.title}
+                              className="w-8 h-8 object-cover flex-shrink-0"
+                            />
                             <div>
                               <p className="text-sm text-white">{a.title}</p>
                               <p className="text-xs text-[#999999]">{a.artistName}</p>

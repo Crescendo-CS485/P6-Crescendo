@@ -200,3 +200,19 @@ I still see the dev tools in the local running?
 
 RESPONSE:
 Confirmed Developer Controls were still present on multiple pages beyond ArtistPage (Discovery, Discussion, Community, Lists, Genres, NewReleases, BestAlbums). Removed all remaining Developer Controls/UI state overrides across those pages, updated related tests, and verified frontend test suite passes. If dev server still shows old UI, refresh/restart Vite to clear stale HMR state.
+
+---
+
+PROMPT:
+Can you check as to why there are some music without album covers and fix?
+
+RESPONSE:
+Investigated missing album art and found the seeded backend includes albums with `cover_url = None` by design in some entries. Fixed this at the API model layer by updating `Album.to_dict()` to return a fallback cover URL (`artist.image_url`) whenever `cover_url` is missing, so all album tiles now receive a valid image URL. Re-ran backend tests successfully.
+
+---
+
+PROMPT:
+I am still seeing the missing cover art DOM Path: div#root > div.min-h-.creen bg-[#1a1a1a] > main.min-h-[calc(100vh-64px)] > div.max-w-[1600px] mx-auto px-4 .m:px-6 py-6 > div.grid grid-col.-2 .m:grid-col.-3 lg:grid-col.-4 xl:grid-col.-5 2xl:grid-col.-6 gap-4 > a.bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] tran.ition-color. duration-200 flex flex-col h-full[6] > div.relative a.pect-.quare overflow-hidden border-b border-[#333333] > div.w-full h-full flex item.-center ju.stify-center bg-[#1a1a1a]
+
+RESPONSE:
+Implemented a stronger cover-art fallback across API and UI. Backend now includes `artistImage` in album payloads and genre cover image aggregation falls back to artist image when album cover is missing. Frontend album renderers now consistently use `coverUrl || artistImage` in Album cards, list rows, add-album modal, new releases cards, and search results. Re-ran backend and frontend tests successfully.

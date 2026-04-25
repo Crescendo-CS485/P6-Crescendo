@@ -149,9 +149,9 @@ export default function NewReleasesPage() {
                     className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors flex flex-col"
                   >
                     <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-                      {album.coverUrl ? (
+                      {(album.coverUrl || album.artistImage) ? (
                         <img
-                          src={album.coverUrl}
+                          src={album.coverUrl || album.artistImage}
                           alt={album.title}
                           className="w-full h-full object-cover"
                         />

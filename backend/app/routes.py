@@ -235,7 +235,11 @@ def get_album_genres():
         count = len(albums)
         scores = [a.user_score for a in albums if a.user_score is not None]
         avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
-        cover_images = [a.cover_url for a in albums[:4] if a.cover_url]
+        cover_images = [
+            (a.cover_url or (a.artist.image_url if a.artist else None))
+            for a in albums[:4]
+            if (a.cover_url or (a.artist.image_url if a.artist else None))
+        ]
         result.append({
             "name": genre.name,
             "albumCount": count,

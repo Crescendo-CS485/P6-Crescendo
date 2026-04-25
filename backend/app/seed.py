@@ -1,3 +1,4 @@
+import random
 from datetime import datetime, timezone, date
 from . import db
 from .models import Artist, Genre, User, LLMPersona, Discussion, Post, Album, List, ListAlbum
@@ -274,6 +275,7 @@ def seed():
 
     _seed_bots_and_discussions()
     _seed_albums()
+    _ensure_catalog_albums()
     _seed_lists()
 
 
@@ -1055,6 +1057,63 @@ def _seed_albums():
 
     db.session.commit()
     print(f"Seeded {len(ALBUMS_DATA)} albums.")
+
+
+# Synthetic padding so discovery pages have a full catalog (idempotent).
+CATALOG_ALBUM_TARGET = 500
+CATALOG_TITLE_PREFIX = "Crescendo Catalog #"
+
+
+def _ensure_catalog_albums():
+    """Pad to CATALOG_ALBUM_TARGET albums using existing artists (covers via artist image)."""
+    current = Album.query.count()
+    if current >= CATALOG_ALBUM_TARGET:
+        print(
+            f"Album count {current} meets target ({CATALOG_ALBUM_TARGET}), skipping catalog padding."
+        )
+        return
+
+    artists = Artist.query.all()
+    if not artists:
+        print("No artists in database; skipping catalog album padding.")
+        return
+
+    needed = CATALOG_ALBUM_TARGET - current
+    rng = random.Random(20260425)
+    album_types = (["studio"] * 8) + ["live", "ep"]
+
+    for i in range(needed):
+        seq = current + i + 1
+        artist = artists[i % len(artists)]
+        year = rng.randint(1995, 2025)
+        release_date = date(year, rng.randint(1, 12), rng.randint(1, 28))
+        base = 6.4 + rng.random() * 2.9
+        user_score = round(min(9.9, base + rng.random() * 0.45), 1)
+        critic_score = (
+            round(min(9.9, base + (rng.random() - 0.35) * 0.55), 1)
+            if rng.random() > 0.08
+            else None
+        )
+        album = Album(
+            title=f"{CATALOG_TITLE_PREFIX}{seq:05d}",
+            artist_id=artist.id,
+            cover_url=None,
+            release_date=release_date,
+            release_year=year,
+            user_score=user_score,
+            critic_score=critic_score,
+            review_count=rng.randint(12, 8900),
+            discussion_count=rng.randint(0, 400),
+            list_appearances=rng.randint(0, 120),
+            album_type=album_types[i % len(album_types)],
+        )
+        db.session.add(album)
+        db.session.flush()
+        for genre in artist.genres:
+            album.genres.append(genre)
+
+    db.session.commit()
+    print(f"Added {needed} catalog albums (target total {CATALOG_ALBUM_TARGET}).")
 
 
 def _seed_lists():

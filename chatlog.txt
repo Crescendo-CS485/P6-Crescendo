@@ -216,3 +216,11 @@ I am still seeing the missing cover art DOM Path: div#root > div.min-h-.creen bg
 
 RESPONSE:
 Implemented a stronger cover-art fallback across API and UI. Backend now includes `artistImage` in album payloads and genre cover image aggregation falls back to artist image when album cover is missing. Frontend album renderers now consistently use `coverUrl || artistImage` in Album cards, list rows, add-album modal, new releases cards, and search results. Re-ran backend and frontend tests successfully.
+
+---
+
+PROMPT:
+now that we have a working product, let's add more albums. 500 should work.
+
+RESPONSE:
+Extended `backend/app/seed.py` with `_ensure_catalog_albums()` (target 500, idempotent): after curated `_seed_albums()`, pads with synthetic "Crescendo Catalog #NNNNN" titles on rotating seeded artists, varied years/scores/types, `cover_url=None` so artist image fallback applies. Re-ran pytest (86 passed). Restart the backend so `seed()` runs and tops up existing DBs toward 500 albums.

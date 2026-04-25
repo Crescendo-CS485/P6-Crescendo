@@ -240,3 +240,11 @@ do it for me and keep in mind that on aws we have a database, so these can event
 
 RESPONSE:
 Restarted local backend so `seed()` ran (spotlight rows inserted where missing). Hardened synthetic catalog for persistent DBs: `SEED_CATALOG_TARGET` (default 500, `0` skips filler), `SEED_SPOTLIGHT_ALBUMS` (`false` skips demos), catalog titles use max existing `Crescendo Catalog #` suffix + 1 to avoid duplicate titles after deletes. Documented in `CLAUDE.md`.
+
+---
+
+PROMPT:
+yeah let's make sure we have things clear and ready
+
+RESPONSE:
+Aligned docs with real behavior: README removes stray line, expands Production Runtime Notes (run.py vs Lambda seeding), corrects first-run / idempotency copy, env table adds `SEED_*`, `CORS_*`, session cookies; RDS/Lambda section no longer implies automatic seed on Lambda cold start; adds optional Lambda env rows and a short readiness checklist. CLAUDE.md directory blurb for `seed.py` updated.

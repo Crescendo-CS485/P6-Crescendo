@@ -1,5 +1,5 @@
 # Crescendo
--Tester
+
 A full-stack music discovery platform with AI-powered community discussions. Users can browse artists and albums, post in discussion threads, and curate personal lists. Synthetic bot personas (powered by Claude Haiku) automatically seed and respond to discussions to simulate organic fan activity — all transparently labeled.
 
 ---
@@ -31,6 +31,8 @@ Open that URL in any modern browser. From there you can:
   - `SESSION_COOKIE_SAMESITE=None`
   - `CORS_ORIGINS=https://<your-frontend-domain>`
 - The production frontend should set `VITE_API_BASE` to the deployed API URL.
+- **Database seeding:** `backend/run.py` runs `db.create_all()` then `seed()` on every process start (local dev or any host that uses `run.py` as the entrypoint). The **Lambda** handler (`lambda_handler.py`) only calls `create_app()` — it does **not** run `seed()` unless you add that yourself. For RDS, run migrations / initial seed explicitly (e.g. one-off job or container that executes `run.py` once) if you rely on seeded content in production.
+- **Synthetic catalog (optional on RDS):** By default `seed()` pads album count toward **500** with idempotent `Crescendo Catalog #…` rows and adds **Spotlight — …** filter-demo albums once. Tune with `SEED_CATALOG_TARGET` / `SEED_SPOTLIGHT_ALBUMS` (see [Environment variables reference](#5-environment-variables-reference)).
 
 ---
 
@@ -375,20 +377,22 @@ python run.py
 
 On first run, `run.py` will:
 1. Create all database tables via SQLAlchemy
-2. Seed the database with 24 real artists, 67 albums, 4 AI bot personas, sample discussions and posts, and 3 curated lists
+2. Run `seed()`: **24** curated artists, **67** curated albums, **4** bot personas with discussions/posts, **3** lists; then pad total albums toward **`SEED_CATALOG_TARGET`** (default **500**) with synthetic catalog rows, then idempotent **Spotlight — …** albums for UI time/year/genre filters
 3. Start the Flask development server on **http://localhost:5001**
 
-You should see output like:
+You should see log lines similar to:
 
 ```
 Seeded 24 artists.
 Seeded 4 bot personas and discussions for 24 artists.
 Seeded 67 albums.
+Added … catalog albums (target total 500).
+Added … spotlight demo albums for time/year/genre filters.   # or "already present, skipping"
 Seeded 3 lists.
  * Running on http://127.0.0.1:5001
 ```
 
-> The seed is idempotent — restarting the server will not duplicate data.
+> **Idempotency:** Curated artists, bots, the 67 hand-picked albums, and lists insert once and are skipped on later runs. Catalog padding runs only while album count is below the target. Spotlight albums are skipped if their fixed titles already exist. Synthetic catalog titles use the next free `Crescendo Catalog #` suffix so partial deletes do not create duplicate titles.
 
 ---
 
@@ -434,6 +438,18 @@ You should see the Crescendo discovery page populated with real artists and albu
 | `DATABASE_URL` | Yes | PostgreSQL connection string for the single app database (`crescendo_p4`) |
 | `ANTHROPIC_API_KEY` | For LLM features | Anthropic API key for Claude Haiku (trigger / bot activity) |
 | `SECRET_KEY` | Recommended | Flask session signing key (defaults in `config.py` if omitted) |
+| `SEED_CATALOG_TARGET` | No | Default **`500`**. Max total albums after synthetic padding when `run.py` runs `seed()`. Set **`0`** to skip synthetic **Crescendo Catalog** rows (curated + spotlight unchanged unless disabled below). |
+| `SEED_SPOTLIGHT_ALBUMS` | No | Default **`true`**. Set **`false`** to skip idempotent **Spotlight — …** demo albums. |
+| `CORS_ORIGINS` | Production | Comma-separated allowed browser origins for credentialed API calls (see [Production Runtime Notes](#production-runtime-notes)). |
+| `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE` | Production | Set when API and frontend are on different sites (see above). |
+
+### Readiness checklist (local or release)
+
+- [ ] `DATABASE_URL` points at the intended database; schema exists (`python run.py` once from `backend/`, or your migration process).
+- [ ] For production: `CORS_ORIGINS`, `SESSION_COOKIE_*`, and frontend `VITE_API_BASE` (or build-time API URL) match the deployed domains.
+- [ ] Decide **`SEED_CATALOG_TARGET`** / **`SEED_SPOTLIGHT_ALBUMS`** for RDS (defaults add synthetic catalog + spotlight when `run.py` runs `seed()`).
+- [ ] `pytest` / `npm test` pass before tagging or merging.
+- [ ] Lambda: confirm whether you rely on **manual/one-off seed** vs extending the handler to call `seed()` (see [Production Runtime Notes](#production-runtime-notes)).
 
 ---
 
@@ -504,7 +520,7 @@ P4 Crescendo/
 │   │   ├── auth_routes.py       # Auth endpoints
 │   │   ├── list_routes.py       # List endpoints
 │   │   ├── scheduler.py         # APScheduler singleton
-│   │   └── seed.py              # Database seed (24 artists, 67 albums, 4 bot personas)
+│   │   └── seed.py              # Idempotent seed: artists, albums, bots, lists, catalog pad, spotlight
 │   │   └── services/
 │   │       ├── llm_service.py           # Claude Haiku API calls
 │   │       ├── llm_worker.py            # Job execution logic
@@ -778,7 +794,7 @@ Create the empty database once:
 psql -h RDS_ENDPOINT -U USER -c "CREATE DATABASE crescendo_p4;"
 ```
 
-The app creates tables and seeds data automatically on first startup.
+Tables and seed data are **not** created by Lambda cold start alone. Use **`python run.py`** (or an equivalent one-off/migration step) against RDS when you want `create_all` + `seed()`, or manage schema with Alembic/migrations and insert data separately.
 
 ### Step 2 — Create the Lambda function (backend)
 
@@ -794,8 +810,12 @@ The app creates tables and seeds data automatically on first startup.
    | `DATABASE_URL` | `postgresql://USER:PASSWORD@RDS_ENDPOINT:5432/crescendo_p4` |
    | `ANTHROPIC_API_KEY` | Your key from [console.anthropic.com](https://console.anthropic.com/) |
    | `SECRET_KEY` | Any long random string |
+   | `SEED_CATALOG_TARGET` (optional) | `500` (default) or `0` to skip synthetic catalog padding |
+   | `SEED_SPOTLIGHT_ALBUMS` (optional) | `true` (default) or `false` to skip Spotlight demo albums |
 
-4. Under **Configuration → General configuration**, increase **Timeout** to at least **30 seconds** (seeding on cold start can take a few seconds).
+4. Under **Configuration → General configuration**, increase **Timeout** to at least **30 seconds** (large requests or cold starts).
+
+> If you add `seed()` to Lambda startup later, allow extra time the first time the database is empty.
 5. Under **Configuration → Function URL**, click **Create function URL**, auth type **NONE**. Copy the URL — this is your API base URL.
 6. Update the frontend's `VITE_API_BASE_URL` (or the Vite proxy target) to point at your function URL.
 

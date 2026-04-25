@@ -59,7 +59,7 @@ P4 Cresendo/
 │   │   ├── routes.py      # GET /api/artists, /genres, /artists/:id/discussions,
 │   │   │                  # GET /api/discussions/:id/posts, POST /api/events
 │   │   ├── scheduler.py   # APScheduler singleton + app reference for job context
-│   │   └── seed.py        # 8 artists + 4 bot personas + seed discussions/posts (idempotent)
+│   │   └── seed.py        # Artists, albums, bots, lists; catalog pad + spotlight (see README / SEED_*)
 │   │   └── services/
 │   │       ├── llm_service.py           # LLMServiceAPI → Anthropic Claude Haiku
 │   │       ├── activity_aggregation.py  # ActivityAggregationService → update artist scores

@@ -232,3 +232,11 @@ can we add some recent albums so 2026 and every premade filter has something to 
 
 RESPONSE:
 Added `_ensure_spotlight_albums()` in `seed.py`: idempotent "Spotlight — …" rows for New Releases (`today`, `this-week`, `this-month`, `upcoming`), Best Albums year pills (`2024`–`2026`), and one 2026 album per genre matching the Best Albums chip list (incl. Rock, Country, Blues, Dance). Catalog random `release_year` now includes 2026. Restart backend once so seed inserts any missing spotlight rows.
+
+---
+
+PROMPT:
+do it for me and keep in mind that on aws we have a database, so these can eventually exist on production the 500 albums.
+
+RESPONSE:
+Restarted local backend so `seed()` ran (spotlight rows inserted where missing). Hardened synthetic catalog for persistent DBs: `SEED_CATALOG_TARGET` (default 500, `0` skips filler), `SEED_SPOTLIGHT_ALBUMS` (`false` skips demos), catalog titles use max existing `Crescendo Catalog #` suffix + 1 to avoid duplicate titles after deletes. Documented in `CLAUDE.md`.

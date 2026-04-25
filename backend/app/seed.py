@@ -1,3 +1,4 @@
+import os
 import random
 from datetime import datetime, timezone, date, timedelta
 from . import db
@@ -1061,17 +1062,56 @@ def _seed_albums():
 
 
 # Synthetic padding so discovery pages have a full catalog (idempotent).
-CATALOG_ALBUM_TARGET = 500
+# SEED_CATALOG_TARGET: total album rows to aim for (default 500). Set 0 on AWS to skip filler only.
+# SEED_SPOTLIGHT_ALBUMS: "false" to skip idempotent Spotlight — demo rows (default true).
 CATALOG_TITLE_PREFIX = "Crescendo Catalog #"
 
 
+def _seed_catalog_target() -> int:
+    raw = os.environ.get("SEED_CATALOG_TARGET", "500").strip()
+    try:
+        return int(raw)
+    except ValueError:
+        return 500
+
+
+def _seed_spotlight_enabled() -> bool:
+    return os.environ.get("SEED_SPOTLIGHT_ALBUMS", "true").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _max_catalog_suffix_number() -> int:
+    """Largest numeric suffix on Crescendo Catalog #NNNNN titles (0 if none)."""
+    prefix = CATALOG_TITLE_PREFIX
+    best = 0
+    for (title,) in (
+        Album.query.filter(Album.title.like(f"{prefix}%"))
+        .with_entities(Album.title)
+        .all()
+    ):
+        if not title.startswith(prefix):
+            continue
+        tail = title[len(prefix) :].strip()
+        if not tail.isdigit():
+            continue
+        best = max(best, int(tail))
+    return best
+
+
 def _ensure_catalog_albums():
-    """Pad to CATALOG_ALBUM_TARGET albums using existing artists (covers via artist image)."""
+    """Pad album count to SEED_CATALOG_TARGET using existing artists (covers via artist image)."""
+    target = _seed_catalog_target()
+    if target <= 0:
+        print("SEED_CATALOG_TARGET is 0; skipping synthetic catalog padding.")
+        return
+
     current = Album.query.count()
-    if current >= CATALOG_ALBUM_TARGET:
-        print(
-            f"Album count {current} meets target ({CATALOG_ALBUM_TARGET}), skipping catalog padding."
-        )
+    if current >= target:
+        print(f"Album count {current} meets target ({target}), skipping catalog padding.")
         return
 
     artists = Artist.query.all()
@@ -1079,12 +1119,13 @@ def _ensure_catalog_albums():
         print("No artists in database; skipping catalog album padding.")
         return
 
-    needed = CATALOG_ALBUM_TARGET - current
+    needed = target - current
     rng = random.Random(20260425)
     album_types = (["studio"] * 8) + ["live", "ep"]
+    next_seq = _max_catalog_suffix_number() + 1
 
     for i in range(needed):
-        seq = current + i + 1
+        seq = next_seq + i
         artist = artists[i % len(artists)]
         year = rng.randint(1995, 2026)
         release_date = date(year, rng.randint(1, 12), rng.randint(1, 28))
@@ -1114,7 +1155,7 @@ def _ensure_catalog_albums():
             album.genres.append(genre)
 
     db.session.commit()
-    print(f"Added {needed} catalog albums (target total {CATALOG_ALBUM_TARGET}).")
+    print(f"Added {needed} catalog albums (target total {target}).")
 
 
 # Mirrors `genres` in frontend/src/app/data/mockData.ts (Best Albums filter chips).
@@ -1135,6 +1176,10 @@ SPOTLIGHT_FILTER_GENRES = [
 
 def _ensure_spotlight_albums():
     """Idempotent demo rows so New Releases / Best Albums filters always return hits."""
+    if not _seed_spotlight_enabled():
+        print("SEED_SPOTLIGHT_ALBUMS disabled; skipping spotlight demo albums.")
+        return
+
     artists = Artist.query.all()
     if not artists:
         return

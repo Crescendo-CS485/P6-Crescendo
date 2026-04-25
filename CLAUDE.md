@@ -20,6 +20,11 @@ createdb crescendo_p4          # first time only
 python run.py                  # → http://localhost:5001
 ```
 
+On startup, `run.py` calls `seed()` against `DATABASE_URL`. For a **persistent production DB** (e.g. AWS RDS), seeding is idempotent: curated rows skip if present, **Spotlight —** albums insert once by title, synthetic **Crescendo Catalog #** rows pad toward a target without duplicate titles after partial deletes. Optional env:
+
+- **`SEED_CATALOG_TARGET`** — default `500`; set **`0`** to skip synthetic catalog padding only (real + spotlight rows unchanged).
+- **`SEED_SPOTLIGHT_ALBUMS`** — default `true`; set **`false`** to skip idempotent filter-demo albums.
+
 ### Frontend
 ```bash
 cd frontend

@@ -15,11 +15,20 @@ def create_app(test_config=None):
     else:
         app.config.from_object("config.Config")
 
-    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_HTTPONLY"] = True
 
     db.init_app(app)
-    CORS(app)
+
+    cors_raw = app.config.get("CORS_ORIGINS") or ""
+    if isinstance(cors_raw, str) and cors_raw.strip():
+        origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
+        CORS(
+            app,
+            resources={r"/api/*": {"origins": origins}},
+            supports_credentials=True,
+        )
+    else:
+        CORS(app)
 
     from .routes import bp
     app.register_blueprint(bp)
@@ -29,6 +38,10 @@ def create_app(test_config=None):
 
     from .list_routes import list_bp
     app.register_blueprint(list_bp)
+
+    if app.config.get("ENABLE_DEBUG_ROUTES"):
+        from .debug_routes import debug_bp
+        app.register_blueprint(debug_bp)
 
     if not _IS_LAMBDA:
         from .scheduler import init_scheduler

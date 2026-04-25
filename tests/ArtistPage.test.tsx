@@ -3,6 +3,28 @@ import { render, screen, waitFor, act, fireEvent } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { toast } from "sonner";
+
+jest.mock("../frontend/src/app/context/AuthContext", () => {
+  const actual = jest.requireActual("../frontend/src/app/context/AuthContext");
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: {
+        id: "1",
+        displayName: "Test User",
+        handle: "@tester",
+        email: "test@example.com",
+        isBot: false,
+        botLabel: null,
+      },
+      isLoading: false,
+      register: jest.fn(),
+      login: jest.fn(),
+      logout: jest.fn(),
+    }),
+  };
+});
+
 import ArtistPage, { formatTime } from "../frontend/src/app/pages/ArtistPage";
 
 jest.mock("sonner", () => ({
@@ -350,7 +372,10 @@ describe("Inline queryFn (artist)", () => {
     });
     renderPage("art-42");
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/artists/art-42");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/artists/art-42",
+        expect.objectContaining({ credentials: "include" }),
+      );
     });
   });
 
@@ -421,7 +446,10 @@ describe("Inline queryFn (discussions)", () => {
     });
     renderPage("art-42");
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/artists/art-42/discussions");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/artists/art-42/discussions",
+        expect.objectContaining({ credentials: "include" }),
+      );
     });
   });
 
@@ -532,11 +560,15 @@ describe("handleTrigger", () => {
     });
     await loadAndClickTrigger();
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: "page_activation", artistId: "1" }),
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/events",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventType: "page_activation", artistId: "1" }),
+          credentials: "include",
+        }),
+      );
     });
   });
 

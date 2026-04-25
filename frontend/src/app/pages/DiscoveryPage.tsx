@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, BarChart3 } from "lucide-react";
 import { FilterBar } from "../components/FilterBar";
@@ -64,7 +64,7 @@ export default function DiscoveryPage() {
   const { data, isLoading, isError, refetch } = useQuery<ArtistsResponse>({
     queryKey: ["artists", { activeDiscussions, selectedGenres, selectedTimeRange, sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/artists?${queryParams}`).then((r) => {
+      apiFetch(`${API_BASE}/api/artists?${queryParams}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch artists");
         return r.json();
       }),

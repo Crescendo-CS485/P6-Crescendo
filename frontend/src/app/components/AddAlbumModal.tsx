@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Loader2 } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Album } from "../data/mockData";
 
@@ -45,7 +45,7 @@ export function AddAlbumModal({
   const { data, isLoading } = useQuery<AlbumsResponse>({
     queryKey: ["albums-picker"],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => r.json()),
+      apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => r.json()),
     enabled: isOpen,
     staleTime: 60_000,
   });
@@ -63,7 +63,7 @@ export function AddAlbumModal({
   async function handleAdd(albumId: string) {
     setAdding(albumId);
     try {
-      const res = await fetch(`${API_BASE}/api/lists/${listId}/albums`, {
+      const res = await apiFetch(`${API_BASE}/api/lists/${listId}/albums`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ albumId }),

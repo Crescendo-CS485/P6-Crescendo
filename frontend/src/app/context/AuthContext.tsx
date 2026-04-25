@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 
 export interface AuthUser {
   id: string;
@@ -40,16 +40,13 @@ function persistUser(user: AuthUser | null) {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialise from localStorage so the user survives page refresh / backend restart.
-  // When real server-side sessions land, GET /api/auth/me will become authoritative
-  // and this localStorage layer can be promoted to a secondary cache or removed.
+  // Initialise from localStorage so the UI survives refresh; GET /api/auth/me reconciles with the server.
   const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Verify the stored session is still valid server-side.
-    // Currently the stub always returns null, so we keep the localStorage value.
-    fetch(`${API_BASE}/api/auth/me`)
+    // Reconcile with Flask session (requires apiFetch credentials: "include").
+    apiFetch(`${API_BASE}/api/auth/me`)
       .then((r) => r.json())
       .then((data) => {
         if (data.user) {
@@ -71,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(displayName: string, handle: string, email: string, password: string) {
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
+    const res = await apiFetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ displayName, handle, email, password }),
@@ -82,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await apiFetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -93,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
+    await apiFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
     setAndPersist(null);
   }
 

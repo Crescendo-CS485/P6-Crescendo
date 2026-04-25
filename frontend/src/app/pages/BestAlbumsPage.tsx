@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, LayoutGrid, List, Star, MessageSquare } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
@@ -107,7 +107,7 @@ export default function BestAlbumsPage() {
   const { data, isLoading, isError, refetch } = useQuery<AlbumsResponse>({
     queryKey: ["albums", { timeRange, selectedGenres, sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?${params}`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch albums");
         return r.json();
       }),

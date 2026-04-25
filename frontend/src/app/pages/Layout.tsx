@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
@@ -26,7 +26,7 @@ export default function Layout() {
       return;
     }
     const t = setTimeout(() =>
-      fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
+      apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
         .then((r) => r.json())
         .then(setSearchResults),
       300

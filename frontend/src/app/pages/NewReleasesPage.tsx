@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Star, MessageSquare, Music } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
@@ -47,7 +47,7 @@ export default function NewReleasesPage() {
   const { data, isLoading, isError, refetch } = useQuery<AlbumsResponse>({
     queryKey: ["albums-releases", { timeFilter }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?${params}`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch releases");
         return r.json();
       }),

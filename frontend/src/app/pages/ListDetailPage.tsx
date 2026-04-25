@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { ArrowLeft, Heart, Music, Loader2, Plus, X } from "lucide-react";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
@@ -23,7 +23,7 @@ export default function ListDetailPage() {
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
     queryKey: ["list", id],
     queryFn: () =>
-      fetch(`${API_BASE}/api/lists/${id}`).then((r) => {
+      apiFetch(`${API_BASE}/api/lists/${id}`).then((r) => {
         if (!r.ok) throw new Error("List not found");
         return r.json();
       }),
@@ -35,7 +35,7 @@ export default function ListDetailPage() {
   async function handleRemove(albumId: string) {
     setRemoving(albumId);
     try {
-      await fetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
+      await apiFetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
       queryClient.invalidateQueries({ queryKey: ["list", id] });
     } finally {
       setRemoving(null);

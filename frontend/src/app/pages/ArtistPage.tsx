@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MessageSquare, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,13 +31,14 @@ export function formatTime(isoString: string): string {
 
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [triggering, setTriggering] = useState(false);
   const [devState, setDevState] = useState<DevState | null>(null);
 
   const { data: artistData, isLoading: artistLoading } = useQuery<ArtistResponse>({
     queryKey: ["artist", id],
     queryFn: () =>
-      fetch(`${API_BASE}/api/artists/${id}`).then((r) => {
+      apiFetch(`${API_BASE}/api/artists/${id}`).then((r) => {
         if (!r.ok) throw new Error("Not found");
         return r.json();
       }),
@@ -49,7 +51,7 @@ export default function ArtistPage() {
     useQuery<DiscussionsResponse>({
       queryKey: ["discussions", id],
       queryFn: () =>
-        fetch(`${API_BASE}/api/artists/${id}/discussions`).then((r) => {
+        apiFetch(`${API_BASE}/api/artists/${id}/discussions`).then((r) => {
           if (!r.ok) throw new Error("Failed to fetch discussions");
           return r.json();
         }),
@@ -61,9 +63,13 @@ export default function ArtistPage() {
 
   async function handleTrigger() {
     if (!id) return;
+    if (!user) {
+      toast.error("Sign in to trigger LLM activity");
+      return;
+    }
     setTriggering(true);
     try {
-      const res = await fetch(`${API_BASE}/api/events`, {
+      const res = await apiFetch(`${API_BASE}/api/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventType: "page_activation", artistId: id }),
@@ -156,7 +162,7 @@ export default function ArtistPage() {
           <div className="mb-8">
             <Button
               onClick={handleTrigger}
-              disabled={triggering}
+              disabled={triggering || !user}
               className="bg-[#ff6b35] hover:bg-[#e55a2b] text-white font-semibold rounded-sm h-9 px-4 text-sm flex items-center gap-2 disabled:opacity-60"
             >
               {triggering ? (
@@ -168,6 +174,7 @@ export default function ArtistPage() {
             </Button>
             <p className="text-[11px] text-[#888888] mt-1.5">
               Schedules 3–5 synthetic fan comments across discussions (10–120s delay)
+              {!user && " — sign in to use this."}
             </p>
           </div>
 

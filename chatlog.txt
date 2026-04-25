@@ -152,3 +152,27 @@ Follow-up refinement after validation review.
 
 RESPONSE:
 Refined the "Authenticated post" expected-output wording in tests/integration/SPEC.md to keep implementation accuracy (client sends displayName/handle in signed-in flow) while emphasizing observable integration behavior (post renders with logged-in identity and no additional name/handle prompt).
+
+---
+
+PROMPT:
+can you run this application and ensure that it's working?
+
+RESPONSE:
+Installed backend venv and pip dependencies; PostgreSQL was not available in this WSL environment (no psql, Docker not integrated), so verified the stack with DATABASE_URL pointing at a local SQLite file for run.py. Seeded DB, started Flask on http://127.0.0.1:5001 (GET /api/artists OK). Ran npm ci in frontend, started Vite on http://127.0.0.1:5173 (root 200, /api/genres proxied OK). Ran pytest ../tests/ (84 passed). Note: root npm run test fails without pytest-cov installed.
+
+---
+
+PROMPT:
+camn we begin review the application for production readyness? assume the aws infrastruture is complete.
+
+RESPONSE:
+Delivered a structured production-readiness review (security, auth/sessions, Lambda vs LLM worker, CORS, debug routes, list authorization, frontend API/cookies, config, observability). No code changes in this turn.
+
+---
+
+PROMPT:
+okay let's do it
+
+RESPONSE:
+Implemented production-hardening: gated `/api/debug/*` behind ENABLE_DEBUG_ROUTES (default off; tests set env); CORS_ORIGINS + credentialed CORS when set; SESSION_COOKIE_SECURE and SESSION_COOKIE_SAMESITE in config; POST /api/events and POST /api/discussions/.../posts require session; list create/add/remove require auth and owner match; moved debug routes to debug_routes.py; frontend apiFetch(..., { credentials: include }) site-wide, CommentBox body-only, ArtistPage trigger requires sign-in; Jest apiMock exports apiFetch; added pytest-cov; tests and SPEC.md updated.

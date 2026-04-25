@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Loader2, List } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
@@ -38,7 +38,7 @@ export function CreateListModal({ isOpen, onClose, onCreated }: CreateListModalP
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/lists`, {
+      const res = await apiFetch(`${API_BASE}/api/lists`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

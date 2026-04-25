@@ -1,10 +1,9 @@
 """
-Tests for backend/app/routes.py
+Tests for backend/app/routes.py and app/debug_routes.py (when ENABLE_DEBUG_ROUTES).
 
-Covers all 14 route handlers: get_artists, get_artist, get_genres,
-post_event, get_artist_discussions, create_post, get_discussion_posts,
-get_albums, get_album_genres, get_all_discussions, get_stats, search,
-debug_jobs, debug_run_job.
+Covers route handlers including get_artists, get_artist, get_genres, post_event,
+get_artist_discussions, create_post, get_discussion_posts, get_albums,
+get_album_genres, get_all_discussions, get_stats, search, debug_jobs, debug_run_job.
 """
 
 from datetime import datetime, timezone, timedelta, date
@@ -161,10 +160,24 @@ class TestGetGenres:
 
 # ── POST /api/events ───────────────────────────────────────────────────
 
+def _register_session(client):
+    r = client.post(
+        "/api/auth/register",
+        json={
+            "displayName": "Event Human",
+            "handle": "eventhuman",
+            "email": "eventhuman@example.com",
+            "password": "password123",
+        },
+    )
+    assert r.status_code == 201
+
+
 class TestPostEvent:
     """Spec tests 14-17"""
 
     def test_successful_trigger(self, client, make_artist, make_user, make_persona):
+        _register_session(client)
         a = make_artist(name="TrigArt")
         # Need at least 3 personas (StaggerScheduler picks randint(3, min(5, N)))
         bot1 = make_user(display_name="Bot1", handle="@trigbot1", is_bot=True)
@@ -188,11 +201,13 @@ class TestPostEvent:
         assert data["job_count"] >= 1
 
     def test_missing_artist_id(self, client):
+        _register_session(client)
         r = client.post("/api/events", json={"eventType": "page_activation"})
         assert r.status_code == 400
         assert "artistId" in r.get_json()["error"]
 
     def test_nonexistent_artist(self, client):
+        _register_session(client)
         r = client.post("/api/events", json={
             "eventType": "page_activation",
             "artistId": 9999,
@@ -200,6 +215,7 @@ class TestPostEvent:
         assert r.status_code == 404
 
     def test_dedup_within_60s(self, client, make_artist, make_user, make_persona):
+        _register_session(client)
         a = make_artist(name="DedupArt")
         bot1 = make_user(display_name="DBot1", handle="@dedupbot1", is_bot=True)
         bot2 = make_user(display_name="DBot2", handle="@dedupbot2", is_bot=True)
@@ -222,6 +238,26 @@ class TestPostEvent:
             "eventType": "page_activation", "artistId": a.id,
         })
         assert r2.get_json()["job_count"] == 0
+
+    def test_events_require_auth(self, client, make_artist, make_user, make_persona):
+        a = make_artist(name="NoAuthTrig")
+        bot1 = make_user(display_name="NA1", handle="@nabot1", is_bot=True)
+        bot2 = make_user(display_name="NA2", handle="@nabot2", is_bot=True)
+        bot3 = make_user(display_name="NA3", handle="@nabot3", is_bot=True)
+        make_persona(bot1.id)
+        make_persona(bot2.id, name="NA2")
+        make_persona(bot3.id, name="NA3")
+        disc = Discussion(
+            artist_id=a.id, author_user_id=bot1.id,
+            title="NA disc", post_count=0,
+        )
+        db.session.add(disc)
+        db.session.commit()
+        r = client.post("/api/events", json={
+            "eventType": "page_activation",
+            "artistId": a.id,
+        })
+        assert r.status_code == 401
 
 
 # ── GET /api/artists/<id>/discussions ──────────────────────────────────
@@ -280,7 +316,7 @@ class TestCreatePost:
         assert data["post"]["body"] == "Great song!"
         assert data["post"]["author"]["handle"] == "@sess_user"
 
-    def test_with_display_name_handle(self, client, make_artist, make_user, make_discussion):
+    def test_without_session_returns_401(self, client, make_artist, make_user, make_discussion):
         a = make_artist(name="PostArt2")
         u = make_user(handle="@anon_creator")
         d = make_discussion(a.id, u.id)
@@ -290,29 +326,31 @@ class TestCreatePost:
             "displayName": "Guest",
             "handle": "@guest",
         })
-        assert r.status_code == 201
-        assert r.get_json()["post"]["author"]["displayName"] == "Guest"
+        assert r.status_code == 401
 
-    def test_create_post_creates_user_and_post(self, client, make_artist, make_user, make_discussion):
+    def test_session_identity_ignores_spoofed_body_fields(self, client, make_artist, make_user, make_discussion):
         a = make_artist(name="NewPostArtist", activity_score=3.0)
-        # Seed a bot user to be the discussion author
         bot = make_user(display_name="Seed Bot", handle="@seedbot", is_bot=True)
+        human = make_user(display_name="Real Human", handle="@realhuman")
         d = make_discussion(a.id, bot.id, title="Discussion")
         db.session.commit()
 
-        payload = {"body": "Hello world", "displayName": "NewUser", "handle": "newuser"}
+        with client.session_transaction() as sess:
+            sess["user_id"] = human.id
+
+        payload = {"body": "Hello world", "displayName": "FakeName", "handle": "@fakehandle"}
         resp = client.post(f"/api/discussions/{d.id}/posts", json=payload)
         assert resp.status_code == 201
         post = resp.get_json()["post"]
         assert post["body"] == "Hello world"
-        assert post["author"]["displayName"] == "NewUser"
-        assert post["author"]["handle"] == "@newuser"
+        assert post["author"]["displayName"] == "Real Human"
+        assert post["author"]["handle"] == "@realhuman"
 
-        user = User.query.filter_by(handle="@newuser").first()
-        assert user is not None
-        assert user.display_name == "NewUser"
-
-    def test_404_missing_discussion(self, client):
+    def test_404_missing_discussion(self, client, make_user):
+        u = make_user(handle="@miss_disc")
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
         r = client.post("/api/discussions/9999/posts", json={"body": "Hello"})
         assert r.status_code == 404
 
@@ -334,18 +372,6 @@ class TestCreatePost:
         client.post(f"/api/discussions/{d.id}/posts", json={"body": "Test"})
         db.session.expire(d)
         assert Discussion.query.get(d.id).post_count == 6
-
-    def test_handle_gets_at_prefix(self, client, make_artist, make_user, make_discussion):
-        a = make_artist(name="PrefixArt")
-        u = make_user(handle="@prefix_creator")
-        d = make_discussion(a.id, u.id)
-        db.session.commit()
-        client.post(f"/api/discussions/{d.id}/posts", json={
-            "body": "Hi",
-            "handle": "noatsign",
-        })
-        created_user = User.query.filter_by(handle="@noatsign").first()
-        assert created_user is not None
 
 
 # ── GET /api/discussions/<id>/posts ────────────────────────────────────
@@ -671,13 +697,30 @@ class TestDebugRunJob:
 class TestEdgeCases:
     """Edge-case tests merged from tests/test_edge_cases.py"""
 
+    def _register(self, client, suffix="edge"):
+        r = client.post(
+            "/api/auth/register",
+            json={
+                "displayName": "List Owner",
+                "handle": suffix,
+                "email": f"{suffix}@example.com",
+                "password": "password123",
+            },
+        )
+        assert r.status_code == 201
+
+    def test_create_list_requires_auth(self, client):
+        resp = client.post("/api/lists", json={"title": "X"})
+        assert resp.status_code == 401
+
     def test_create_list_requires_title(self, client):
+        self._register(client, "notitle")
         resp = client.post("/api/lists", json={})
         assert resp.status_code == 400
         assert "error" in resp.get_json()
 
     def test_add_album_requires_albumId(self, client):
-        # create list
+        self._register(client, "albumid")
         r = client.post("/api/lists", json={"title": "My List"})
         assert r.status_code == 201
         list_id = int(r.get_json()["list"]["id"])
@@ -687,6 +730,7 @@ class TestEdgeCases:
         assert resp.get_json()["error"] == "albumId is required"
 
     def test_add_album_album_not_found(self, client):
+        self._register(client, "alb_nf")
         r = client.post("/api/lists", json={"title": "L2"})
         list_id = int(r.get_json()["list"]["id"])
 
@@ -695,6 +739,7 @@ class TestEdgeCases:
         assert resp.get_json()["error"] == "Album not found"
 
     def test_add_album_idempotent(self, client, make_artist, make_album):
+        self._register(client, "idem")
         a = make_artist(name="AlbumListArtist")
         album = make_album(title="UniqueAlbum", artist_id=a.id)
         db.session.commit()
@@ -712,8 +757,24 @@ class TestEdgeCases:
         assert len(lst["albums"]) == 1
 
     def test_remove_album_nonexistent_list(self, client):
+        self._register(client, "remlist")
         resp = client.delete("/api/lists/99999/albums/1")
         assert resp.status_code == 404
+
+    def test_add_album_forbidden_other_owner(self, client, make_artist, make_album):
+        a = make_artist(name="OwnArt")
+        album = make_album(title="OwnAlb", artist_id=a.id)
+        db.session.commit()
+
+        self._register(client, "owner1")
+        r = client.post("/api/lists", json={"title": "Mine"})
+        list_id = int(r.get_json()["list"]["id"])
+
+        client.post("/api/auth/logout")
+        self._register(client, "owner2")
+
+        resp = client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
+        assert resp.status_code == 403
 
     def test_register_login_and_duplicate_register(self, client):
         # Register

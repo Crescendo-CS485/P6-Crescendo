@@ -33,7 +33,11 @@ export function CreateAlbumModal({ isOpen, onClose, onCreated }: CreateAlbumModa
 
   const { data, isLoading, isError, refetch } = useQuery<ArtistsResponse>({
     queryKey: ["artists-lite"],
-    queryFn: () => apiFetch(`${API_BASE}/api/artists?per_page=200&sort=activity`).then((r) => r.json()),
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/artists?per_page=200&sort=activity`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load artists");
+        return r.json();
+      }),
     enabled: isOpen,
     staleTime: 60_000,
   });

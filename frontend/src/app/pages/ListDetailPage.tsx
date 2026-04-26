@@ -189,12 +189,16 @@ export default function ListDetailPage() {
               <div className="flex border border-[#333333]">
                 <button
                   onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                  title="Grid view"
                   className={`p-1.5 ${viewMode === "grid" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                  title="List view"
                   className={`p-1.5 ${viewMode === "list" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
                 >
                   <ListIcon className="w-4 h-4" />

@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-import os
 from flask import Blueprint, request, jsonify, session, current_app
 from sqlalchemy import nullslast, func
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
@@ -54,7 +53,7 @@ def get_artists():
 
 @bp.route("/artists", methods=["POST"])
 def create_artist():
-    if not os.environ.get("ENABLE_CATALOG_WRITE") and not current_app.config.get("ENABLE_CATALOG_WRITE"):
+    if not current_app.config.get("ENABLE_CATALOG_WRITE"):
         return jsonify({"error": "Catalog write is disabled"}), 404
 
     if not session.get("user_id"):
@@ -284,7 +283,7 @@ def get_albums():
 
 @bp.route("/albums", methods=["POST"])
 def create_album():
-    if not os.environ.get("ENABLE_CATALOG_WRITE") and not current_app.config.get("ENABLE_CATALOG_WRITE"):
+    if not current_app.config.get("ENABLE_CATALOG_WRITE"):
         return jsonify({"error": "Catalog write is disabled"}), 404
 
     if not session.get("user_id"):

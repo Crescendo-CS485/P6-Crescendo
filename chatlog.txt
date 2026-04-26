@@ -248,3 +248,11 @@ yeah let's make sure we have things clear and ready
 
 RESPONSE:
 Aligned docs with real behavior: README removes stray line, expands Production Runtime Notes (run.py vs Lambda seeding), corrects first-run / idempotency copy, env table adds `SEED_*`, `CORS_*`, session cookies; RDS/Lambda section no longer implies automatic seed on Lambda cold start; adds optional Lambda env rows and a short readiness checklist. CLAUDE.md directory blurb for `seed.py` updated.
+
+---
+
+PROMPT:
+https://github.com/Crescendo-CS485/P6-Crescendo/pull/10  can you baby sit this PR?
+
+RESPONSE:
+Triaged PR #10 review feedback and implemented remaining high-confidence fixes: catalog write flag checks now use parsed config booleans, profile and create-album query loaders now throw on non-OK responses so error UI can render, and grid/list icon toggle buttons now include accessible names. Verified no linter issues on edited files and prepared branch for push/re-run of CI.

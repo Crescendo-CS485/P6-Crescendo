@@ -45,7 +45,11 @@ export default function ProfilePage() {
     refetch: refetchLists,
   } = useQuery<ListsResponse>({
     queryKey: ["lists"],
-    queryFn: () => apiFetch(`${API_BASE}/api/lists`).then((r) => r.json()),
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/lists`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load lists");
+        return r.json();
+      }),
     staleTime: 30_000,
   });
 

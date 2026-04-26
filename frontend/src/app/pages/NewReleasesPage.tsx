@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Star, MessageSquare, Music } from "lucide-react";
+import { Star, MessageSquare, Music } from "lucide-react";
 import { API_BASE } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
 import { Album } from "../data/mockData";
+import { FilterBar } from "../components/FilterBar";
 
 interface AlbumsResponse {
   albums: Album[];
@@ -79,23 +80,14 @@ export default function NewReleasesPage() {
         </div>
       </div>
 
-      {/* Time Filter */}
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
-        <Calendar className="w-4 h-4 text-[#666666]" />
-        {TIME_FILTERS.map((tf) => (
-          <button
-            key={tf.value}
-            onClick={() => setTimeFilter(tf.value)}
-            className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${
-              timeFilter === tf.value
-                ? "bg-[#5b9dd9] text-white"
-                : "bg-[#252525] text-[#999999] border border-[#333333] hover:text-white hover:border-[#5b9dd9]"
-            }`}
-          >
-            {tf.label}
-          </button>
-        ))}
-      </div>
+      {/* Filter Bar */}
+      <FilterBar
+        selectedTimeRange={timeFilter}
+        onTimeRangeChange={(v) => setTimeFilter(v as TimeFilter)}
+        timeRangeOptions={TIME_FILTERS}
+        defaultTimeRange="all-time"
+        onReset={() => setTimeFilter("all-time")}
+      />
 
       {/* Error */}
       {effectiveError && <ErrorState onRetry={() => refetch()} />}

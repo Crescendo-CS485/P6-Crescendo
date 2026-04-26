@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
+import { FilterBar } from "../components/FilterBar";
 import { Button } from "../components/ui/button";
 import {
   Select,
@@ -184,54 +185,16 @@ export default function BestAlbumsPage() {
         </div>
       </div>
 
-      {/* Time Range Filter */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span className="text-xs text-[#666666] uppercase tracking-wide">Period:</span>
-        {TIME_RANGES.map((tr) => (
-          <button
-            key={tr.value}
-            onClick={() => { setTimeRange(tr.value); setPage(1); }}
-            className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${
-              timeRange === tr.value
-                ? "bg-[#5b9dd9] text-white"
-                : "bg-[#252525] text-[#999999] border border-[#333333] hover:text-white hover:border-[#5b9dd9]"
-            }`}
-          >
-            {tr.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Genre Filter */}
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
-        <span className="text-xs text-[#666666] uppercase tracking-wide">Genre:</span>
-        {genres.map((g) => (
-          <button
-            key={g}
-            onClick={() => {
-              setSelectedGenres((prev) =>
-                prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
-              );
-              setPage(1);
-            }}
-            className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${
-              selectedGenres.includes(g)
-                ? "bg-[#5b9dd9] text-white"
-                : "bg-[#252525] text-[#999999] border border-[#333333] hover:text-white hover:border-[#5b9dd9]"
-            }`}
-          >
-            {g}
-          </button>
-        ))}
-        {selectedGenres.length > 0 && (
-          <button
-            onClick={() => { setSelectedGenres([]); setPage(1); }}
-            className="text-xs px-3 py-1.5 rounded-sm text-[#999999] hover:text-white transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {/* Filter Bar */}
+      <FilterBar
+        selectedTimeRange={timeRange}
+        onTimeRangeChange={(v) => { setTimeRange(v as TimeRange); setPage(1); }}
+        timeRangeOptions={TIME_RANGES}
+        defaultTimeRange="all-time"
+        selectedGenres={selectedGenres}
+        onGenresChange={(g) => { setSelectedGenres(g); setPage(1); }}
+        onReset={handleReset}
+      />
 
       {/* Error */}
       {effectiveError && <ErrorState onRetry={() => refetch()} />}

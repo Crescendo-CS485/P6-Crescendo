@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from sqlalchemy import func
 from . import db
 
 artist_genres = db.Table(
@@ -33,10 +34,15 @@ class Artist(db.Model):
     )
 
     def to_dict(self):
-        # Find the most recently active discussion for this artist
         latest_disc = (
             max(self.discussions, key=lambda d: d.last_activity_at)
             if self.discussions else None
+        )
+        listener_count = (
+            db.session.query(func.count(func.distinct(Post.author_user_id)))
+            .join(Discussion, Post.discussion_id == Discussion.id)
+            .filter(Discussion.artist_id == self.id)
+            .scalar() or 0
         )
         return {
             "id": str(self.id),
@@ -44,10 +50,11 @@ class Artist(db.Model):
             "image": self.image_url,
             "bio": self.bio,
             "activityScore": self.activity_score,
-            "discussionCount": self.discussion_count,
+            "discussionCount": len(self.discussions),
+            "listenerCount": listener_count,
             "latestThread": {
                 "id": str(latest_disc.id) if latest_disc else None,
-                "title": self.latest_thread_title,
+                "title": latest_disc.title if latest_disc else None,
                 "timestamp": self.latest_thread_timestamp,
             },
             "genres": [g.name for g in self.genres],

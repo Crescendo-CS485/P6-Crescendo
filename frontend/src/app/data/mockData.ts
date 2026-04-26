@@ -31,9 +31,10 @@ export interface Artist {
   bio: string;
   activityScore: number;
   discussionCount: number;
+  listenerCount: number;
   latestThread: {
-    id: string;
-    title: string;
+    id: string | null;
+    title: string | null;
     timestamp: string;
   };
   genres: string[];

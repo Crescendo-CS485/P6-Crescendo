@@ -71,9 +71,9 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
             <MessageSquare className="w-3 h-3" aria-hidden="true" />
             <span aria-hidden="true">{artist.discussionCount}</span>
           </div>
-          <div className="flex items-center gap-1" aria-label={`${(artist.discussionCount * 3.4).toFixed(0)} listeners`}>
+          <div className="flex items-center gap-1" aria-label={`${artist.listenerCount} listeners`}>
             <Users className="w-3 h-3" aria-hidden="true" />
-            <span aria-hidden="true">{(artist.discussionCount * 3.4).toFixed(0)}</span>
+            <span aria-hidden="true">{artist.listenerCount}</span>
           </div>
         </div>
 

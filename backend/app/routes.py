@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, session
-from sqlalchemy import nullslast
+from sqlalchemy import nullslast, func
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
 from . import db
 
@@ -25,7 +25,13 @@ def get_artists():
     # Sort
     sort = request.args.get("sort", "activity")
     if sort == "recent":
-        query = query.order_by(Artist.discussion_count.desc())
+        disc_count_subq = (
+            db.session.query(func.count(Discussion.id))
+            .filter(Discussion.artist_id == Artist.id)
+            .correlate(Artist)
+            .scalar_subquery()
+        )
+        query = query.order_by(disc_count_subq.desc())
     else:
         query = query.order_by(Artist.activity_score.desc())
 

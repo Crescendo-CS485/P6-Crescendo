@@ -874,3 +874,69 @@ class TestListLike:
         data = resp.get_json()
         assert data["liked"] is False
         assert data["likeCount"] == 0
+
+
+class TestListFork:
+    """Tests for POST /api/lists/:id/fork"""
+
+    def test_unauthenticated_returns_401(self, client, make_user):
+        u = make_user(handle="@fork_anon_owner")
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
+        r = client.post("/api/lists", json={"title": "Source List"})
+        list_id = r.get_json()["list"]["id"]
+        with client.session_transaction() as sess:
+            sess.clear()
+        resp = client.post(f"/api/lists/{list_id}/fork")
+        assert resp.status_code == 401
+
+    def test_missing_list_returns_404(self, client, make_user):
+        u = make_user(handle="@fork_404")
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
+        resp = client.post("/api/lists/99999/fork")
+        assert resp.status_code == 404
+
+    def test_fork_creates_copy_with_albums(self, client, make_user, make_artist, make_album):
+        owner = make_user(handle="@fork_owner")
+        forker = make_user(handle="@fork_forker")
+        artist = make_artist(name="ForkArtist")
+        album = make_album(title="ForkAlbum", artist_id=artist.id)
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = owner.id
+        r = client.post("/api/lists", json={"title": "Original"})
+        list_id = r.get_json()["list"]["id"]
+        client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = forker.id
+        resp = client.post(f"/api/lists/{list_id}/fork")
+        assert resp.status_code == 201
+        data = resp.get_json()["list"]
+        assert data["title"] == "Original (copy)"
+        assert data["creatorUserId"] == str(forker.id)
+
+    def test_fork_albums_are_copied(self, client, make_user, make_artist, make_album):
+        owner = make_user(handle="@fork_album_owner")
+        forker = make_user(handle="@fork_album_forker")
+        artist = make_artist(name="ForkAlbumArtist")
+        album = make_album(title="CopiedAlbum", artist_id=artist.id)
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = owner.id
+        r = client.post("/api/lists", json={"title": "WithAlbums"})
+        list_id = r.get_json()["list"]["id"]
+        client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = forker.id
+        fork_resp = client.post(f"/api/lists/{list_id}/fork")
+        fork_id = fork_resp.get_json()["list"]["id"]
+
+        detail = client.get(f"/api/lists/{fork_id}").get_json()["list"]
+        assert detail["albumCount"] == 1

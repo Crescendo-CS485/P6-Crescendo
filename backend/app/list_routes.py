@@ -134,7 +134,7 @@ def fork_list(list_id):
     if not user_id:
         return jsonify({"error": "Sign in to copy a list"}), 401
 
-    source = List.query.get(list_id)
+    source = db.session.get(List, list_id)
     if not source:
         return jsonify({"error": "List not found"}), 404
 

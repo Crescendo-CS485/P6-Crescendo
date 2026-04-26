@@ -55,7 +55,7 @@ class Artist(db.Model):
             "latestThread": {
                 "id": str(latest_disc.id) if latest_disc else None,
                 "title": latest_disc.title if latest_disc else None,
-                "timestamp": self.latest_thread_timestamp,
+                "timestamp": latest_disc.last_activity_at.isoformat() if latest_disc else None,
             },
             "genres": [g.name for g in self.genres],
         }

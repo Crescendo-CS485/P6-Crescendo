@@ -82,22 +82,24 @@ export default function ListDetailPage() {
   async function handleLike() {
     if (!user) return;
     setLiking(true);
+    const prevLiked = localLiked;
+    const prevCount = localLikeCount;
     const optimisticLiked = !localLiked;
     setLocalLiked(optimisticLiked);
     setLocalLikeCount((c) => optimisticLiked ? c + 1 : Math.max(0, c - 1));
     try {
-      const res = await fetch(`${API_BASE}/api/lists/${id}/like`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await apiFetch(`${API_BASE}/api/lists/${id}/like`, { method: "POST" });
       if (res.ok) {
         const result = await res.json();
         setLocalLiked(result.liked);
         setLocalLikeCount(result.likeCount);
       } else {
-        setLocalLiked(!optimisticLiked);
-        setLocalLikeCount((c) => optimisticLiked ? c - 1 : c + 1);
+        setLocalLiked(prevLiked);
+        setLocalLikeCount(prevCount);
       }
+    } catch {
+      setLocalLiked(prevLiked);
+      setLocalLikeCount(prevCount);
     } finally {
       setLiking(false);
     }
@@ -106,11 +108,10 @@ export default function ListDetailPage() {
   async function handleFork() {
     setForking(true);
     try {
-      const res = await fetch(`${API_BASE}/api/lists/${id}/fork`, { method: "POST" });
+      const res = await apiFetch(`${API_BASE}/api/lists/${id}/fork`, { method: "POST" });
+      if (!res.ok) return;
       const result = await res.json();
-      if (res.ok) {
-        navigate(`/lists/${result.list.id}`);
-      }
+      navigate(`/lists/${result.list.id}`);
     } finally {
       setForking(false);
     }
@@ -119,8 +120,10 @@ export default function ListDetailPage() {
   async function handleRemove(albumId: string) {
     setRemoving(albumId);
     try {
-      await apiFetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
-      queryClient.invalidateQueries({ queryKey: ["list", id] });
+      const res = await apiFetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["list", id] });
+      }
     } finally {
       setRemoving(null);
     }

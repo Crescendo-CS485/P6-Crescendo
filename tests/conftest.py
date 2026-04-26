@@ -57,13 +57,14 @@ def clean_tables(app):
     yield
     from app import db
     from app.models import (
-        LLMJob, Post, ListAlbum, List, Discussion,
+        LLMJob, Post, ListAlbum, ListLike, List, Discussion,
         LLMPersona, Album, User, Artist, Genre,
     )
     # Order matters: children before parents
     db.session.query(LLMJob).delete()
     db.session.query(Post).delete()
     db.session.query(ListAlbum).delete()
+    db.session.query(ListLike).delete()
     db.session.query(List).delete()
     db.session.query(Discussion).delete()
     db.session.query(LLMPersona).delete()

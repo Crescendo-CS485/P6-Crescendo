@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router";
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { API_BASE } from "../../lib/api";
-import { ArrowLeft, Heart, Music, Loader2, Plus, X } from "lucide-react";
+import { ArrowLeft, Heart, Music, Loader2, Plus, X, Copy } from "lucide-react";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { AddAlbumModal } from "../components/AddAlbumModal";
@@ -16,9 +16,15 @@ interface ListDetailResponse {
 export default function ListDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [showForkBanner, setShowForkBanner] = useState(false);
+  const [forking, setForking] = useState(false);
+  const [localLiked, setLocalLiked] = useState(false);
+  const [localLikeCount, setLocalLikeCount] = useState(0);
+  const [liking, setLiking] = useState(false);
 
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
     queryKey: ["list", id],
@@ -31,6 +37,51 @@ export default function ListDetailPage() {
   });
 
   const list = data?.list;
+  const isOwner = !!user && !!list?.creatorUserId && user.id === list.creatorUserId;
+
+  useEffect(() => {
+    if (list) {
+      setLocalLiked(list.userHasLiked);
+      setLocalLikeCount(list.likes);
+    }
+  }, [list]);
+
+  async function handleLike() {
+    if (!user) return;
+    setLiking(true);
+    const optimisticLiked = !localLiked;
+    setLocalLiked(optimisticLiked);
+    setLocalLikeCount((c) => optimisticLiked ? c + 1 : Math.max(0, c - 1));
+    try {
+      const res = await fetch(`${API_BASE}/api/lists/${id}/like`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setLocalLiked(result.liked);
+        setLocalLikeCount(result.likeCount);
+      } else {
+        setLocalLiked(!optimisticLiked);
+        setLocalLikeCount((c) => optimisticLiked ? c - 1 : c + 1);
+      }
+    } finally {
+      setLiking(false);
+    }
+  }
+
+  async function handleFork() {
+    setForking(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/lists/${id}/fork`, { method: "POST" });
+      const result = await res.json();
+      if (res.ok) {
+        navigate(`/lists/${result.list.id}`);
+      }
+    } finally {
+      setForking(false);
+    }
+  }
 
   async function handleRemove(albumId: string) {
     setRemoving(albumId);
@@ -99,14 +150,26 @@ export default function ListDetailPage() {
                 <Music className="w-4 h-4" />
                 <span>{list.albumCount} albums</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Heart className="w-4 h-4" />
-                <span>{list.likes}</span>
-              </div>
+              {user ? (
+                <button
+                  onClick={handleLike}
+                  disabled={liking}
+                  className={`flex items-center gap-1.5 transition-colors ${localLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"}`}
+                  title={localLiked ? "Unlike" : "Like"}
+                >
+                  <Heart className={`w-4 h-4 ${localLiked ? "fill-current" : ""}`} />
+                  <span>{localLikeCount}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[#666666]">
+                  <Heart className="w-4 h-4" />
+                  <span>{localLikeCount}</span>
+                </div>
+              )}
             </div>
             {user && (
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => isOwner ? setShowAddModal(true) : setShowForkBanner(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white text-sm font-medium rounded-sm transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -117,6 +180,32 @@ export default function ListDetailPage() {
         </div>
       </div>
 
+      {/* Fork confirmation banner */}
+      {showForkBanner && (
+        <div className="mb-6 p-4 bg-[#252525] border border-[#5b9dd9] flex flex-col sm:flex-row sm:items-center gap-3">
+          <Copy className="w-4 h-4 text-[#5b9dd9] flex-shrink-0" />
+          <p className="text-sm text-white flex-1">
+            You don't own this list. A copy will be created under your account and you can edit it from there.
+          </p>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={handleFork}
+              disabled={forking}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-60"
+            >
+              {forking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+              Create Copy
+            </button>
+            <button
+              onClick={() => setShowForkBanner(false)}
+              className="px-3 py-1.5 text-sm text-[#999999] hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Albums */}
       {list.albums.length === 0 ? (
         <div className="text-center py-16 bg-[#252525] border border-[#333333]">
@@ -124,7 +213,7 @@ export default function ListDetailPage() {
           <p className="text-white font-medium mb-1">No albums yet</p>
           {user ? (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => isOwner ? setShowAddModal(true) : setShowForkBanner(true)}
               className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white text-sm font-medium rounded-sm transition-colors mx-auto"
             >
               <Plus className="w-4 h-4" />
@@ -139,7 +228,7 @@ export default function ListDetailPage() {
           {list.albums.map((album) => (
             <div key={album.id} className="relative group">
               <AlbumCard album={album} />
-              {user && (
+              {isOwner && (
                 <button
                   onClick={() => handleRemove(album.id)}
                   disabled={removing === album.id}

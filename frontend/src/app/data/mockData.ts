@@ -62,8 +62,10 @@ export interface UserList {
   title: string;
   description: string;
   createdBy: string;
+  creatorUserId: string | null;
   albumCount: number;
   likes: number;
+  userHasLiked: boolean;
 }
 
 export interface UserListDetail extends UserList {
@@ -77,8 +79,10 @@ export const mockLists: UserList[] = [
     description:
       "A curated collection of the strongest releases in the first quarter of 2026. From indie bedroom recordings to polished electronic productions.",
     createdBy: "MusicEnthusiast",
+    creatorUserId: null,
     albumCount: 5,
     likes: 142,
+    userHasLiked: false,
   },
   {
     id: "list-2",
@@ -86,8 +90,10 @@ export const mockLists: UserList[] = [
     description:
       "From ambient to techno, these albums define what electronic music can achieve. A journey through synthesizers, samples, and studio craft.",
     createdBy: "GenreHistorian",
+    creatorUserId: null,
     albumCount: 8,
     likes: 97,
+    userHasLiked: false,
   },
   {
     id: "list-3",
@@ -95,8 +101,10 @@ export const mockLists: UserList[] = [
     description:
       "Overlooked bedroom recordings and DIY releases deserving far more attention. These artists are building something special.",
     createdBy: "CriticalEar",
+    creatorUserId: null,
     albumCount: 6,
     likes: 63,
+    userHasLiked: false,
   },
 ];
 

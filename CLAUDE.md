@@ -102,6 +102,8 @@ P4 Cresendo/
 | POST | `/api/events` | `{eventType, artistId}` | `{message, job_count}` |
 | GET | `/api/artists/<id>/discussions` | `page`, `per_page` | `{discussions, total, page, pages}` |
 | GET | `/api/discussions/<id>/posts` | `page`, `per_page` | `{posts, total, page, pages, discussion}` |
+| POST | `/api/lists/:id/like` | — | `{liked, likeCount}` |
+| POST | `/api/lists/:id/fork` | — | `{list}` |
 
 ### API Response Shape (Artist)
 

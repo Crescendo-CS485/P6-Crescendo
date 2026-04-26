@@ -196,6 +196,7 @@ class List(db.Model):
             "title": self.title,
             "description": self.description,
             "createdBy": creator_name,
+            "creatorUserId": str(self.creator_user_id) if self.creator_user_id else None,
             "albumCount": album_count,
             "likes": self.like_count,
         }
@@ -212,6 +213,14 @@ class ListAlbum(db.Model):
     added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     album = db.relationship("Album")
+
+
+class ListLike(db.Model):
+    __tablename__ = "list_like"
+    id = db.Column(db.Integer, primary_key=True)
+    list_id = db.Column(db.Integer, db.ForeignKey("list.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    __table_args__ = (db.UniqueConstraint("list_id", "user_id"),)
 
 
 class LLMJob(db.Model):

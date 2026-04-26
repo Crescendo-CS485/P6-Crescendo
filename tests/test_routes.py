@@ -803,10 +803,10 @@ class TestListLike:
     def test_like_toggle_unlike(self, client, make_user):
         u = make_user(handle="@liker2")
         db.session.commit()
-        r = client.post("/api/lists", json={"title": "L-Toggle"})
-        list_id = r.get_json()["list"]["id"]
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
+        r = client.post("/api/lists", json={"title": "L-Toggle"})
+        list_id = r.get_json()["list"]["id"]
         client.post(f"/api/lists/{list_id}/like")  # like
         resp = client.post(f"/api/lists/{list_id}/like")  # unlike
         assert resp.status_code == 200

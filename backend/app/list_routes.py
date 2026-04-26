@@ -97,22 +97,26 @@ def toggle_like(list_id):
     if not user_id:
         return jsonify({"error": "Sign in to like a list"}), 401
 
-    lst = List.query.get(list_id)
+    lst = db.session.get(List, list_id)
     if not lst:
         return jsonify({"error": "List not found"}), 404
 
-    existing = ListLike.query.filter_by(list_id=list_id, user_id=user_id).first()
+    existing = db.session.execute(
+        db.select(ListLike).filter_by(list_id=list_id, user_id=user_id)
+    ).scalar_one_or_none()
+
     if existing:
         db.session.delete(existing)
-        lst.like_count = max(0, lst.like_count - 1)
+        like_count = max(0, lst.like_count - 1)
         liked = False
     else:
         db.session.add(ListLike(list_id=list_id, user_id=user_id))
-        lst.like_count += 1
+        like_count = lst.like_count + 1
         liked = True
 
+    lst.like_count = like_count
     db.session.commit()
-    return jsonify({"liked": liked, "likeCount": lst.like_count})
+    return jsonify({"liked": liked, "likeCount": like_count})
 
 
 @list_bp.route("/<int:list_id>/fork", methods=["POST"])

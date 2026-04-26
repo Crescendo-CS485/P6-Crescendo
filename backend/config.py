@@ -21,6 +21,7 @@ class Config:
     CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").strip()
 
     ENABLE_DEBUG_ROUTES = _truthy(os.environ.get("ENABLE_DEBUG_ROUTES", ""))
+    ENABLE_CATALOG_WRITE = _truthy(os.environ.get("ENABLE_CATALOG_WRITE", ""))
 
     SESSION_COOKIE_SECURE = _truthy(os.environ.get("SESSION_COOKIE_SECURE", ""))
     SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")

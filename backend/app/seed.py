@@ -1068,15 +1068,34 @@ CATALOG_TITLE_PREFIX = "Crescendo Catalog #"
 
 
 def _seed_catalog_target() -> int:
-    raw = os.environ.get("SEED_CATALOG_TARGET", "500").strip()
+    # Production should not ship with synthetic placeholder albums showing up in UI.
+    # Default behavior:
+    # - AWS Lambda (or explicit production env): no synthetic padding unless explicitly enabled
+    # - Local/dev: pad to a fuller catalog for UX demos
+    default_target = "0" if (
+        os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("FLASK_ENV", "").lower() == "production"
+        or os.environ.get("ENV", "").lower() == "production"
+        or os.environ.get("APP_ENV", "").lower() == "production"
+    ) else "500"
+
+    raw = os.environ.get("SEED_CATALOG_TARGET", default_target).strip()
     try:
         return int(raw)
     except ValueError:
-        return 500
+        return int(default_target)
 
 
 def _seed_spotlight_enabled() -> bool:
-    return os.environ.get("SEED_SPOTLIGHT_ALBUMS", "true").lower() not in (
+    # Spotlight rows are for demoing filters; don't ship them by default in production.
+    default_enabled = "false" if (
+        os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("FLASK_ENV", "").lower() == "production"
+        or os.environ.get("ENV", "").lower() == "production"
+        or os.environ.get("APP_ENV", "").lower() == "production"
+    ) else "true"
+
+    return os.environ.get("SEED_SPOTLIGHT_ALBUMS", default_enabled).lower() not in (
         "0",
         "false",
         "no",

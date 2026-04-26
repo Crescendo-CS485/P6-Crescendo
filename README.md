@@ -32,7 +32,7 @@ Open that URL in any modern browser. From there you can:
   - `CORS_ORIGINS=https://<your-frontend-domain>`
 - The production frontend should set `VITE_API_BASE` to the deployed API URL.
 - **Database seeding:** `backend/run.py` runs `db.create_all()` then `seed()` on every process start (local dev or any host that uses `run.py` as the entrypoint). The **Lambda** handler (`lambda_handler.py`) only calls `create_app()` — it does **not** run `seed()` unless you add that yourself. For RDS, run migrations / initial seed explicitly (e.g. one-off job or container that executes `run.py` once) if you rely on seeded content in production.
-- **Synthetic catalog (optional on RDS):** By default `seed()` pads album count toward **500** with idempotent `Crescendo Catalog #…` rows and adds **Spotlight — …** filter-demo albums once. Tune with `SEED_CATALOG_TARGET` / `SEED_SPOTLIGHT_ALBUMS` (see [Environment variables reference](#5-environment-variables-reference)).
+- **Synthetic catalog (optional on RDS):** In local dev, `seed()` pads album count toward **500** with idempotent `Crescendo Catalog #…` rows and adds **Spotlight — …** filter-demo albums once. **On AWS/Lambda (production), synthetic catalog padding defaults to off** to avoid placeholder titles in the UI. Tune with `SEED_CATALOG_TARGET` / `SEED_SPOTLIGHT_ALBUMS` (see [Environment variables reference](#5-environment-variables-reference)).
 
 ---
 
@@ -296,6 +296,28 @@ npm run dev
 
 App URL: **http://localhost:5173** (Vite proxies `/api/*` to the backend).
 
+### Start backend in production-like mode (recommended for release smoke tests)
+
+This runs the backend **the same way AWS Lambda does** (via `create_app()`), meaning:
+- **No automatic `seed()`**
+- **No APScheduler** (Lambda mode)
+- Debug routes are not registered
+
+1. Configure env (copy the template and edit):
+
+```bash
+cp backend/.env.production.local.example backend/.env
+```
+
+2. Start the backend (from `backend/`):
+
+```bash
+source .venv/bin/activate
+python run_lambda_local.py
+```
+
+Then start the frontend as usual with `npm run dev`.
+
 ### Stop services
 
 - In each terminal where a server is running, press **Ctrl+C** to stop that process.
@@ -438,8 +460,8 @@ You should see the Crescendo discovery page populated with real artists and albu
 | `DATABASE_URL` | Yes | PostgreSQL connection string for the single app database (`crescendo_p4`) |
 | `ANTHROPIC_API_KEY` | For LLM features | Anthropic API key for Claude Haiku (trigger / bot activity) |
 | `SECRET_KEY` | Recommended | Flask session signing key (defaults in `config.py` if omitted) |
-| `SEED_CATALOG_TARGET` | No | Default **`500`**. Max total albums after synthetic padding when `run.py` runs `seed()`. Set **`0`** to skip synthetic **Crescendo Catalog** rows (curated + spotlight unchanged unless disabled below). |
-| `SEED_SPOTLIGHT_ALBUMS` | No | Default **`true`**. Set **`false`** to skip idempotent **Spotlight — …** demo albums. |
+| `SEED_CATALOG_TARGET` | No | Default **`500`** in local/dev, **`0`** on AWS/Lambda/production. Max total albums after synthetic padding when `seed()` runs. Set **`0`** to skip synthetic **Crescendo Catalog** rows (curated + spotlight unchanged unless disabled below). |
+| `SEED_SPOTLIGHT_ALBUMS` | No | Default **`true`** in local/dev, **`false`** on AWS/Lambda/production. Set **`false`** to skip idempotent **Spotlight — …** demo albums. |
 | `CORS_ORIGINS` | Production | Comma-separated allowed browser origins for credentialed API calls (see [Production Runtime Notes](#production-runtime-notes)). |
 | `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE` | Production | Set when API and frontend are on different sites (see above). |
 

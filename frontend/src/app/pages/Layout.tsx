@@ -149,14 +149,18 @@ export default function Layout() {
               {user ? (
                 <>
                   {/* Avatar + name */}
-                  <div className="flex items-center gap-2">
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+                    aria-label="Open profile"
+                  >
                     <div className="w-7 h-7 rounded-sm bg-[#5b9dd9] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                       {user.displayName.charAt(0).toUpperCase()}
                     </div>
                     <span className="hidden sm:block text-sm text-white font-medium max-w-[120px] truncate">
                       {user.displayName}
                     </span>
-                  </div>
+                  </Link>
                   <button
                     onClick={logout}
                     aria-label="Sign out"

@@ -81,13 +81,17 @@ class TestGetArtists:
         data = r.get_json()
         assert data["artists"][0]["activityScore"] == 9.0
 
-    def test_sort_recent(self, client, make_artist):
-        make_artist(name="Few", discussion_count=2)
-        make_artist(name="Many", discussion_count=20)
+    def test_sort_recent(self, client, make_artist, make_user, make_discussion):
+        few = make_artist(name="Few")
+        many = make_artist(name="Many")
+        u = make_user()
+        make_discussion(many.id, u.id, title="D1")
+        make_discussion(many.id, u.id, title="D2")
+        make_discussion(few.id, u.id, title="D3")
         db.session.commit()
         r = client.get("/api/artists?sort=recent")
         data = r.get_json()
-        assert data["artists"][0]["discussionCount"] == 20
+        assert data["artists"][0]["discussionCount"] == 2
 
     def test_pagination(self, client, make_artist):
         for i in range(3):
@@ -136,7 +140,7 @@ class TestGetArtist:
         assert data["id"] == str(a.id)
         assert data["name"] == "Lonely Artist"
         assert data["latestThread"]["id"] == str(d.id)
-        assert data["latestThread"]["title"] == "Lone thread"
+        assert data["latestThread"]["title"] == "Thread Title"
 
 
 # ── GET /api/genres ─────────────────────────────────────────────────────

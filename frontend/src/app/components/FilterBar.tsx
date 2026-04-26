@@ -20,7 +20,7 @@ interface FilterBarProps {
   // Genre section — only rendered when provided
   selectedGenres?: string[];
   onGenresChange?: (genres: string[]) => void;
-  // Time Range section — always rendered; custom options override the default list
+  // Time Range section — only rendered when onTimeRangeChange is provided; custom options override the default list
   selectedTimeRange?: string;
   onTimeRangeChange?: (range: string) => void;
   timeRangeOptions?: { value: string; label: string }[];

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { User, Mail, AtSign, LogOut, ListMusic, Heart, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "../components/PageStates";
@@ -17,6 +17,7 @@ interface ListsResponse {
 
 export default function ProfilePage() {
   const { user, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
   const [addArtistOpen, setAddArtistOpen] = useState(false);
   const [addAlbumOpen, setAddAlbumOpen] = useState(false);
 
@@ -49,7 +50,7 @@ export default function ProfilePage() {
   });
 
   const allLists = listsData?.lists ?? [];
-  const yourLists = allLists.filter((l) => l.createdBy === user.displayName);
+  const yourLists = allLists.filter((l) => l.creatorUserId === user.id);
   const totalLikes = yourLists.reduce((s, l) => s + (l.likes ?? 0), 0);
   const totalAlbums = yourLists.reduce((s, l) => s + (l.albumCount ?? 0), 0);
 
@@ -161,7 +162,7 @@ export default function ProfilePage() {
             title="No lists yet"
             message="Create your first list to start curating albums."
             actionLabel="Go to Lists"
-            onAction={() => (window.location.href = "/lists")}
+            onAction={() => navigate("/lists")}
           />
         )}
 

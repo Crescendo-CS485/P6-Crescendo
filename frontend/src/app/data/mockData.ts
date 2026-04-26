@@ -35,7 +35,7 @@ export interface Artist {
   latestThread: {
     id: string | null;
     title: string | null;
-    timestamp: string;
+    timestamp: string | null;
   };
   genres: string[];
 }

@@ -834,9 +834,15 @@ class TestEdgeCases:
 class TestListLike:
     """Tests for POST /api/lists/:id/like"""
 
-    def test_unauthenticated_returns_401(self, client):
+    def test_unauthenticated_returns_401(self, client, make_user):
+        u = make_user(handle="@like_anon_owner")
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
         r = client.post("/api/lists", json={"title": "Likeable"})
         list_id = r.get_json()["list"]["id"]
+        with client.session_transaction() as sess:
+            sess.clear()
         resp = client.post(f"/api/lists/{list_id}/like")
         assert resp.status_code == 401
 
@@ -851,10 +857,10 @@ class TestListLike:
     def test_like_increments_count(self, client, make_user):
         u = make_user(handle="@liker1")
         db.session.commit()
-        r = client.post("/api/lists", json={"title": "L-Like"})
-        list_id = r.get_json()["list"]["id"]
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
+        r = client.post("/api/lists", json={"title": "L-Like"})
+        list_id = r.get_json()["list"]["id"]
         resp = client.post(f"/api/lists/{list_id}/like")
         assert resp.status_code == 200
         data = resp.get_json()

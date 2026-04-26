@@ -228,9 +228,8 @@ def get_discussion_posts(discussion_id):
 def get_albums():
     query = Album.query
 
-    # Hide synthetic seed rows by default (they're only for demos).
-    # Opt-in to include them with `include_synthetic=true`.
-    include_synthetic = request.args.get("include_synthetic", "false").lower() == "true"
+    # Include synthetic seed rows by default; opt-out with `include_synthetic=false`.
+    include_synthetic = request.args.get("include_synthetic", "true").lower() != "false"
     if not include_synthetic:
         query = query.filter(~Album.title.like("Crescendo Catalog #%"))
         query = query.filter(~Album.title.like("Spotlight —%"))

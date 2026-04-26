@@ -70,8 +70,7 @@ def cleanup_discussions() -> dict[str, int]:
     updated_discussions = 0
     updated_posts = 0
 
-    bot_ids = [u.id for u in User.query.filter_by(is_bot=True).with_entities(User.id).all()]
-    bot_ids = [bid for (bid,) in bot_ids] if bot_ids and isinstance(bot_ids[0], tuple) else bot_ids
+    bot_ids = [bid for (bid,) in User.query.filter_by(is_bot=True).with_entities(User.id).all()]
 
     for artist in Artist.query.order_by(Artist.id.asc()).all():
         discussions = (

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Loader2, BarChart3, LayoutGrid, List as ListIcon } from "lucide-react";
+import { Loader2, BarChart3, LayoutGrid, List as ListIcon, Music } from "lucide-react";
 import { FilterBar } from "../components/FilterBar";
 import { ArtistCard } from "../components/ArtistCard";
 import { ArtistCardSkeleton } from "../components/ArtistCardSkeleton";
@@ -33,11 +33,13 @@ function ArtistRow({ artist }: { artist: Artist }) {
       to={`/artists/${artist.id}`}
       className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3"
     >
-      <img
-        src={artist.image ?? ""}
-        alt={artist.name}
-        className="w-12 h-12 object-cover flex-shrink-0"
-      />
+      {artist.image ? (
+        <img src={artist.image} alt={artist.name} className="w-12 h-12 object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Music className="w-5 h-5 text-[#444444]" />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-bold text-white line-clamp-1 hover:text-[#5b9dd9] transition-colors">
           {artist.name}

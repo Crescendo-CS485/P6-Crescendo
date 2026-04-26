@@ -26,7 +26,6 @@ interface AlbumsResponse {
 type SortOption = "user_score" | "critic_score" | "release_date" | "review_count";
 type TimeRange = "all-time" | "2026" | "2025" | "2024";
 type ViewMode = "grid" | "list";
-type DevState = "loading" | "error" | "empty";
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: "all-time", label: "All Time" },
@@ -95,7 +94,6 @@ export default function BestAlbumsPage() {
   const [sort, setSort] = useState<SortOption>("user_score");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const params = new URLSearchParams();
   params.set("sort", sort);
@@ -117,11 +115,9 @@ export default function BestAlbumsPage() {
   const total = data?.total ?? 0;
   const totalPages = data?.pages ?? 0;
 
-  const effectiveLoading = devState === "loading" || (devState === null && isLoading);
-  const effectiveError = devState === "error" || (devState === null && isError);
-  const effectiveEmpty =
-    devState === "empty" ||
-    (devState === null && !isLoading && !isError && albums.length === 0);
+  const effectiveLoading = isLoading;
+  const effectiveError = isError;
+  const effectiveEmpty = !isLoading && !isError && albums.length === 0;
   const effectiveSuccess = !effectiveLoading && !effectiveError && !effectiveEmpty;
 
   const handleReset = () => {
@@ -129,7 +125,6 @@ export default function BestAlbumsPage() {
     setSelectedGenres([]);
     setSort("user_score");
     setPage(1);
-    setDevState(null);
   };
 
   return (
@@ -318,61 +313,6 @@ export default function BestAlbumsPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live (Success)
-          </Button>
-          <Button
-            onClick={() => setDevState("error")}
-            variant={devState === "error" ? "default" : "outline"}
-            className={
-              devState === "error"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Error State
-          </Button>
-          <Button
-            onClick={() => setDevState("empty")}
-            variant={devState === "empty" ? "default" : "outline"}
-            className={
-              devState === "empty"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Empty State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

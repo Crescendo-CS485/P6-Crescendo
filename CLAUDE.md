@@ -121,7 +121,7 @@ The backend `to_dict()` returns **camelCase** fields to match the frontend `Arti
 
 ### Key Differences from Prototype
 
-- No `DevControlsContext` or DevControls panel
+- No developer controls or DevControls panel — all state simulation tools removed
 - No mock artist data — live API replaces in-memory filtering
 - `mockData.ts` retained only for the `Artist` interface and static `genres`/`timeRanges` constants
 - `DiscoveryPage` uses `useQuery` instead of `useState` + `useMemo` + setTimeout

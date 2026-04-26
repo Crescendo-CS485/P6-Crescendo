@@ -16,8 +16,6 @@ interface DiscussionsResponse {
   total: number;
 }
 
-type DevState = "loading" | "not-found";
-
 export function formatTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -31,7 +29,6 @@ export function formatTime(isoString: string): string {
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
   const [triggering, setTriggering] = useState(false);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const { data: artistData, isLoading: artistLoading } = useQuery<ArtistResponse>({
     queryKey: ["artist", id],
@@ -82,8 +79,8 @@ export default function ArtistPage() {
     }
   }
 
-  const showLoading = devState === "loading" || (devState === null && artistLoading);
-  const showNotFound = devState === "not-found" || (devState === null && !artistLoading && !artist);
+  const showLoading = artistLoading;
+  const showNotFound = !artistLoading && !artist;
   const showContent = !showLoading && !showNotFound;
 
   return (
@@ -217,50 +214,6 @@ export default function ArtistPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live
-          </Button>
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState("not-found")}
-            variant={devState === "not-found" ? "default" : "outline"}
-            className={
-              devState === "not-found"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Not Found State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

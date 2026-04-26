@@ -175,22 +175,25 @@ describe("DiscoveryPage", () => {
 
   // 17
   test("empty state action calls handleReset", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("active_discussions=true")) {
+        return Promise.resolve({ ok: true, json: async () => makeResponse([], 0, 1, 0) });
+      }
+      return Promise.resolve({ ok: true, json: async () => makeResponse([makeArtist()], 1) });
     });
     renderPage();
     await waitFor(() => screen.getByText("Test Artist"));
 
-    // Force empty state via dev controls
-    fireEvent.click(screen.getByRole("button", { name: "Empty State" }));
-    expect(screen.getByText("No Content Found")).toBeInTheDocument();
+    // Toggle active discussions to reach the empty state
+    fireEvent.click(screen.getByRole("switch"));
+    await waitFor(() => screen.getByText("No Content Found"));
 
-    // Click Reset Filters in EmptyState — calls handleReset which sets devState = null
+    // Click Reset Filters in EmptyState — calls handleReset
     fireEvent.click(screen.getByRole("button", { name: /reset filters/i }));
 
     await waitFor(() => {
       expect(screen.queryByText("No Content Found")).not.toBeInTheDocument();
+      expect(screen.getByText("Test Artist")).toBeInTheDocument();
     });
   });
 
@@ -470,8 +473,8 @@ describe("DiscoveryPage", () => {
   // handleReset — tests 33–34
   // ---------------------------------------------------------------------------
 
-  // 33 — handleReset clears all filters, sort, page, and devState
-  test("handleReset clears all filters, sort, page, and devState", async () => {
+  // 33 — handleReset clears all filters, sort, and page
+  test("handleReset clears all filters, sort, and page", async () => {
     mockPaginated();
     renderPage();
     await waitFor(() => screen.getAllByRole("combobox").length >= 2);
@@ -497,32 +500,6 @@ describe("DiscoveryPage", () => {
       expect(url).not.toContain("time_range");
       expect(url).toContain("sort=activity");
       expect(url).toContain("page=1");
-    });
-  });
-
-  // 34 — handleReset is passed to FilterBar as onReset prop
-  // Proof: clicking FilterBar's Reset All also resets devState (only handleReset does this)
-  test("handleReset is passed to FilterBar as onReset prop", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("Test Artist"));
-
-    // Force devState to override
-    fireEvent.click(screen.getByRole("button", { name: "Error State" }));
-    expect(screen.getByText("API Connection Error")).toBeInTheDocument();
-
-    // Activate a filter so FilterBar shows its Reset All button
-    fireEvent.click(screen.getByRole("switch"));
-
-    // FilterBar's onReset IS handleReset — must also clear devState = null
-    fireEvent.click(screen.getByRole("button", { name: "Reset All" }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("API Connection Error")).not.toBeInTheDocument();
-      expect(screen.getByText("Test Artist")).toBeInTheDocument();
     });
   });
 
@@ -678,103 +655,6 @@ describe("DiscoveryPage", () => {
     for (const p of [1, 2, 3, 4, 5]) {
       expect(screen.queryByRole("button", { name: `Page ${p}` })).not.toBeInTheDocument();
     }
-  });
-
-  // ---------------------------------------------------------------------------
-  // Developer Controls — tests 46–49
-  // ---------------------------------------------------------------------------
-
-  // 46 — "Loading State" forces skeleton UI regardless of actual query state
-  test("developer control 'Loading State' forces loading UI", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("Test Artist"));
-
-    fireEvent.click(screen.getByRole("button", { name: "Loading State" }));
-
-    expect(screen.getByText("Loading artist data...")).toBeInTheDocument();
-    expect(screen.queryByText("Test Artist")).not.toBeInTheDocument();
-  });
-
-  // 47 — "Error State" forces error UI regardless of actual query state
-  test("developer control 'Error State' forces error UI", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("Test Artist"));
-
-    fireEvent.click(screen.getByRole("button", { name: "Error State" }));
-
-    expect(screen.getByText("API Connection Error")).toBeInTheDocument();
-    expect(screen.queryByText("Test Artist")).not.toBeInTheDocument();
-  });
-
-  // 48 — "Empty State" forces empty UI regardless of actual query state
-  test("developer control 'Empty State' forces empty UI", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("Test Artist"));
-
-    fireEvent.click(screen.getByRole("button", { name: "Empty State" }));
-
-    expect(screen.getByText("No Content Found")).toBeInTheDocument();
-    expect(screen.queryByText("Test Artist")).not.toBeInTheDocument();
-  });
-
-  // 49 — "Live (Success)" restores component to real query data
-  test("developer control 'Live (Success)' restores real data", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist()], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("Test Artist"));
-
-    fireEvent.click(screen.getByRole("button", { name: "Error State" }));
-    expect(screen.getByText("API Connection Error")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Live (Success)" }));
-
-    expect(screen.queryByText("API Connection Error")).not.toBeInTheDocument();
-    expect(screen.getByText("Test Artist")).toBeInTheDocument();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Go to Artist button — tests 50–51
-  // ---------------------------------------------------------------------------
-
-  // 50 — "Go to Artist" button navigates to first artist's page
-  test("'Go to Artist' button navigates to first artist's page", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([makeArtist({ id: "art-1" })], 1),
-    });
-    renderPage();
-    await waitFor(() => screen.getByRole("button", { name: /go to artist/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /go to artist/i }));
-
-    expect(mockNavigate).toHaveBeenCalledWith("/artists/art-1");
-  });
-
-  // 51 — "Go to Artist" button is hidden when API returns empty artists array
-  test("'Go to Artist' button is hidden when no artists loaded", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => makeResponse([], 0, 1, 0),
-    });
-    renderPage();
-    await waitFor(() => screen.getByText("No Content Found"));
-
-    expect(screen.queryByRole("button", { name: /go to artist/i })).not.toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------------------

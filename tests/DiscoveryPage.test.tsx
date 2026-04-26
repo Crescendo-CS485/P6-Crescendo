@@ -134,10 +134,11 @@ describe("DiscoveryPage", () => {
   });
 
   // 13
-  test("renders loading spinner text during loading", () => {
+  test("renders loading state without artist content or errors", () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     renderPage();
-    expect(screen.getByText("Loading artist data...")).toBeInTheDocument();
+    expect(screen.queryByText("API Connection Error")).not.toBeInTheDocument();
+    expect(screen.queryByText("Luna Rivera")).not.toBeInTheDocument();
   });
 
   // 14

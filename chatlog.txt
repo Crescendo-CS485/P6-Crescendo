@@ -152,3 +152,99 @@ Follow-up refinement after validation review.
 
 RESPONSE:
 Refined the "Authenticated post" expected-output wording in tests/integration/SPEC.md to keep implementation accuracy (client sends displayName/handle in signed-in flow) while emphasizing observable integration behavior (post renders with logged-in identity and no additional name/handle prompt).
+
+---
+
+PROMPT:
+can you run this application and ensure that it's working?
+
+RESPONSE:
+Installed backend venv and pip dependencies; PostgreSQL was not available in this WSL environment (no psql, Docker not integrated), so verified the stack with DATABASE_URL pointing at a local SQLite file for run.py. Seeded DB, started Flask on http://127.0.0.1:5001 (GET /api/artists OK). Ran npm ci in frontend, started Vite on http://127.0.0.1:5173 (root 200, /api/genres proxied OK). Ran pytest ../tests/ (84 passed). Note: root npm run test fails without pytest-cov installed.
+
+---
+
+PROMPT:
+camn we begin review the application for production readyness? assume the aws infrastruture is complete.
+
+RESPONSE:
+Delivered a structured production-readiness review (security, auth/sessions, Lambda vs LLM worker, CORS, debug routes, list authorization, frontend API/cookies, config, observability). No code changes in this turn.
+
+---
+
+PROMPT:
+okay let's do it
+
+RESPONSE:
+Implemented production-hardening: gated `/api/debug/*` behind ENABLE_DEBUG_ROUTES (default off; tests set env); CORS_ORIGINS + credentialed CORS when set; SESSION_COOKIE_SECURE and SESSION_COOKIE_SAMESITE in config; POST /api/events and POST /api/discussions/.../posts require session; list create/add/remove require auth and owner match; moved debug routes to debug_routes.py; frontend apiFetch(..., { credentials: include }) site-wide, CommentBox body-only, ArtistPage trigger requires sign-in; Jest apiMock exports apiFetch; added pytest-cov; tests and SPEC.md updated.
+
+---
+
+PROMPT:
+okay let's work on the polish, review the app and see what is not needed for production.
+
+RESPONSE:
+Reviewed production polish opportunities and identified dev-only elements to remove/tighten (Artist page Developer Controls UI, debug-route hard-disable in Lambda, auth state localStorage fallback, generated coverage artifacts in repo, and runtime docs hygiene).
+
+---
+
+PROMPT:
+let's do it.
+
+RESPONSE:
+Applied production polish cleanup: removed ArtistPage Developer Controls and related tests; hard-disabled debug blueprint registration when running in Lambda even if ENABLE_DEBUG_ROUTES is set; simplified AuthContext to server-session authority (removed localStorage user cache fallback); added ignores for frontend coverage and local backend artifacts (.coverage/sqlite); removed tracked frontend/coverage files; added concise Production Runtime Notes in README; re-ran backend and frontend tests successfully.
+
+---
+
+PROMPT:
+I still see the dev tools in the local running?
+
+RESPONSE:
+Confirmed Developer Controls were still present on multiple pages beyond ArtistPage (Discovery, Discussion, Community, Lists, Genres, NewReleases, BestAlbums). Removed all remaining Developer Controls/UI state overrides across those pages, updated related tests, and verified frontend test suite passes. If dev server still shows old UI, refresh/restart Vite to clear stale HMR state.
+
+---
+
+PROMPT:
+Can you check as to why there are some music without album covers and fix?
+
+RESPONSE:
+Investigated missing album art and found the seeded backend includes albums with `cover_url = None` by design in some entries. Fixed this at the API model layer by updating `Album.to_dict()` to return a fallback cover URL (`artist.image_url`) whenever `cover_url` is missing, so all album tiles now receive a valid image URL. Re-ran backend tests successfully.
+
+---
+
+PROMPT:
+I am still seeing the missing cover art DOM Path: div#root > div.min-h-.creen bg-[#1a1a1a] > main.min-h-[calc(100vh-64px)] > div.max-w-[1600px] mx-auto px-4 .m:px-6 py-6 > div.grid grid-col.-2 .m:grid-col.-3 lg:grid-col.-4 xl:grid-col.-5 2xl:grid-col.-6 gap-4 > a.bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] tran.ition-color. duration-200 flex flex-col h-full[6] > div.relative a.pect-.quare overflow-hidden border-b border-[#333333] > div.w-full h-full flex item.-center ju.stify-center bg-[#1a1a1a]
+
+RESPONSE:
+Implemented a stronger cover-art fallback across API and UI. Backend now includes `artistImage` in album payloads and genre cover image aggregation falls back to artist image when album cover is missing. Frontend album renderers now consistently use `coverUrl || artistImage` in Album cards, list rows, add-album modal, new releases cards, and search results. Re-ran backend and frontend tests successfully.
+
+---
+
+PROMPT:
+now that we have a working product, let's add more albums. 500 should work.
+
+RESPONSE:
+Extended `backend/app/seed.py` with `_ensure_catalog_albums()` (target 500, idempotent): after curated `_seed_albums()`, pads with synthetic "Crescendo Catalog #NNNNN" titles on rotating seeded artists, varied years/scores/types, `cover_url=None` so artist image fallback applies. Re-ran pytest (86 passed). Restart the backend so `seed()` runs and tops up existing DBs toward 500 albums.
+
+---
+
+PROMPT:
+can we add some recent albums so 2026 and every premade filter has something to show.
+
+RESPONSE:
+Added `_ensure_spotlight_albums()` in `seed.py`: idempotent "Spotlight — …" rows for New Releases (`today`, `this-week`, `this-month`, `upcoming`), Best Albums year pills (`2024`–`2026`), and one 2026 album per genre matching the Best Albums chip list (incl. Rock, Country, Blues, Dance). Catalog random `release_year` now includes 2026. Restart backend once so seed inserts any missing spotlight rows.
+
+---
+
+PROMPT:
+do it for me and keep in mind that on aws we have a database, so these can eventually exist on production the 500 albums.
+
+RESPONSE:
+Restarted local backend so `seed()` ran (spotlight rows inserted where missing). Hardened synthetic catalog for persistent DBs: `SEED_CATALOG_TARGET` (default 500, `0` skips filler), `SEED_SPOTLIGHT_ALBUMS` (`false` skips demos), catalog titles use max existing `Crescendo Catalog #` suffix + 1 to avoid duplicate titles after deletes. Documented in `CLAUDE.md`.
+
+---
+
+PROMPT:
+yeah let's make sure we have things clear and ready
+
+RESPONSE:
+Aligned docs with real behavior: README removes stray line, expands Production Runtime Notes (run.py vs Lambda seeding), corrects first-run / idempotency copy, env table adds `SEED_*`, `CORS_*`, session cookies; RDS/Lambda section no longer implies automatic seed on Lambda cold start; adds optional Lambda env rows and a short readiness checklist. CLAUDE.md directory blurb for `seed.py` updated.

@@ -20,6 +20,11 @@ createdb crescendo_p4          # first time only
 python run.py                  # → http://localhost:5001
 ```
 
+On startup, `run.py` calls `seed()` against `DATABASE_URL`. For a **persistent production DB** (e.g. AWS RDS), seeding is idempotent: curated rows skip if present, **Spotlight —** albums insert once by title, synthetic **Crescendo Catalog #** rows pad toward a target without duplicate titles after partial deletes. Optional env:
+
+- **`SEED_CATALOG_TARGET`** — default `500`; set **`0`** to skip synthetic catalog padding only (real + spotlight rows unchanged).
+- **`SEED_SPOTLIGHT_ALBUMS`** — default `true`; set **`false`** to skip idempotent filter-demo albums.
+
 ### Frontend
 ```bash
 cd frontend
@@ -54,7 +59,7 @@ P4 Cresendo/
 │   │   ├── routes.py      # GET /api/artists, /genres, /artists/:id/discussions,
 │   │   │                  # GET /api/discussions/:id/posts, POST /api/events
 │   │   ├── scheduler.py   # APScheduler singleton + app reference for job context
-│   │   └── seed.py        # 8 artists + 4 bot personas + seed discussions/posts (idempotent)
+│   │   └── seed.py        # Artists, albums, bots, lists; catalog pad + spotlight (see README / SEED_*)
 │   │   └── services/
 │   │       ├── llm_service.py           # LLMServiceAPI → Anthropic Claude Haiku
 │   │       ├── activity_aggregation.py  # ActivityAggregationService → update artist scores

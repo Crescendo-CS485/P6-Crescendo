@@ -1,5 +1,6 @@
 from datetime import date, timedelta
-from flask import Blueprint, request, jsonify, session
+import os
+from flask import Blueprint, request, jsonify, session, current_app
 from sqlalchemy import nullslast, func
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
 from . import db
@@ -51,6 +52,51 @@ def get_artists():
     )
 
 
+@bp.route("/artists", methods=["POST"])
+def create_artist():
+    if not os.environ.get("ENABLE_CATALOG_WRITE") and not current_app.config.get("ENABLE_CATALOG_WRITE"):
+        return jsonify({"error": "Catalog write is disabled"}), 404
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    image_url = (data.get("imageUrl") or "").strip() or None
+    bio = (data.get("bio") or "").strip() or None
+    genre_names = data.get("genres") or []
+
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    artist = Artist(
+        name=name,
+        image_url=image_url,
+        bio=bio,
+        activity_score=0.0,
+        discussion_count=0,
+        latest_thread_title=None,
+        latest_thread_timestamp=None,
+    )
+    db.session.add(artist)
+    db.session.flush()
+
+    if isinstance(genre_names, list):
+        for gname in genre_names:
+            g = (gname or "").strip()
+            if not g:
+                continue
+            genre = Genre.query.filter_by(name=g).first()
+            if not genre:
+                genre = Genre(name=g)
+                db.session.add(genre)
+                db.session.flush()
+            artist.genres.append(genre)
+
+    db.session.commit()
+    return jsonify({"artist": artist.to_dict()}), 201
+
+
 @bp.route("/artists/<int:artist_id>")
 def get_artist(artist_id):
     artist = Artist.query.get(artist_id)
@@ -73,6 +119,9 @@ def post_event():
 
     if not artist_id:
         return jsonify({"error": "artistId is required"}), 400
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
 
     from .services.trigger_handler import TriggerHandlerService
     result = TriggerHandlerService().handle_event(event_type, int(artist_id))
@@ -119,20 +168,14 @@ def create_post(discussion_id):
     if not body:
         return jsonify({"error": "Body is required"}), 400
 
-    # Use session user if logged in; otherwise fall back to displayName/handle from body
     user_id = session.get("user_id")
-    if user_id:
-        author = User.query.get(user_id)
-    else:
-        display_name = (data.get("displayName") or "Anonymous").strip()
-        handle = (data.get("handle") or "@anonymous").strip()
-        if not handle.startswith("@"):
-            handle = f"@{handle}"
-        author = User.query.filter_by(handle=handle).first()
-        if not author:
-            author = User(display_name=display_name, handle=handle, is_bot=False)
-            db.session.add(author)
-            db.session.flush()
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    author = User.query.get(user_id)
+    if not author:
+        session.pop("user_id", None)
+        return jsonify({"error": "Invalid session"}), 401
 
     post = Post(
         discussion_id=discussion_id,
@@ -185,6 +228,13 @@ def get_discussion_posts(discussion_id):
 def get_albums():
     query = Album.query
 
+    # Hide synthetic seed rows by default (they're only for demos).
+    # Opt-in to include them with `include_synthetic=true`.
+    include_synthetic = request.args.get("include_synthetic", "false").lower() == "true"
+    if not include_synthetic:
+        query = query.filter(~Album.title.like("Crescendo Catalog #%"))
+        query = query.filter(~Album.title.like("Spotlight —%"))
+
     # Filter: genres (multi-value)
     genres = request.args.getlist("genre")
     if genres:
@@ -233,6 +283,65 @@ def get_albums():
     })
 
 
+@bp.route("/albums", methods=["POST"])
+def create_album():
+    if not os.environ.get("ENABLE_CATALOG_WRITE") and not current_app.config.get("ENABLE_CATALOG_WRITE"):
+        return jsonify({"error": "Catalog write is disabled"}), 404
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    artist_id = data.get("artistId")
+    cover_url = (data.get("coverUrl") or "").strip() or None
+    release_year = data.get("releaseYear")
+    album_type = (data.get("albumType") or "studio").strip() or "studio"
+    genre_names = data.get("genres") or []
+
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    if not artist_id:
+        return jsonify({"error": "artistId is required"}), 400
+
+    artist = Artist.query.get(int(artist_id))
+    if not artist:
+        return jsonify({"error": "Artist not found"}), 404
+
+    year = int(release_year) if release_year else None
+    release_date = date(year, 1, 1) if year else None
+    album = Album(
+        title=title,
+        artist_id=artist.id,
+        cover_url=cover_url,
+        release_date=release_date,
+        release_year=year,
+        user_score=0.0,
+        critic_score=None,
+        review_count=0,
+        discussion_count=0,
+        list_appearances=0,
+        album_type=album_type,
+    )
+    db.session.add(album)
+    db.session.flush()
+
+    if isinstance(genre_names, list):
+        for gname in genre_names:
+            g = (gname or "").strip()
+            if not g:
+                continue
+            genre = Genre.query.filter_by(name=g).first()
+            if not genre:
+                genre = Genre(name=g)
+                db.session.add(genre)
+                db.session.flush()
+            album.genres.append(genre)
+
+    db.session.commit()
+    return jsonify({"album": album.to_dict()}), 201
+
+
 @bp.route("/albums/genres")
 def get_album_genres():
     genres = Genre.query.order_by(Genre.name).all()
@@ -244,7 +353,11 @@ def get_album_genres():
         count = len(albums)
         scores = [a.user_score for a in albums if a.user_score is not None]
         avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
-        cover_images = [a.cover_url for a in albums[:4] if a.cover_url]
+        cover_images = [
+            (a.cover_url or (a.artist.image_url if a.artist else None))
+            for a in albums[:4]
+            if (a.cover_url or (a.artist.image_url if a.artist else None))
+        ]
         result.append({
             "name": genre.name,
             "albumCount": count,
@@ -307,33 +420,3 @@ def search():
         "artists": [a.to_dict() for a in artists],
         "albums": [a.to_dict() for a in albums],
     })
-
-
-@bp.route("/debug/jobs")
-def debug_jobs():
-    """Shows the last 20 LLMJobs and their status/errors."""
-    jobs = LLMJob.query.order_by(LLMJob.created_at.desc()).limit(20).all()
-    return jsonify([
-        {
-            "id": j.id,
-            "artist_id": j.artist_id,
-            "discussion_id": j.discussion_id,
-            "status": j.status,
-            "scheduled_time": j.scheduled_time.isoformat(),
-            "completed_at": j.completed_at.isoformat() if j.completed_at else None,
-            "error_msg": j.error_msg,
-        }
-        for j in jobs
-    ])
-
-
-@bp.route("/debug/run-job/<int:job_id>", methods=["POST"])
-def debug_run_job(job_id):
-    """Synchronously runs a pending job — useful for testing without waiting for the scheduler."""
-    from .services.llm_worker import _execute_job
-    try:
-        _execute_job(job_id)
-        job = LLMJob.query.get(job_id)
-        return jsonify({"status": job.status, "error_msg": job.error_msg})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500

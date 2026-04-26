@@ -47,14 +47,16 @@ def get_list(list_id):
 
 @list_bp.route("", methods=["POST"])
 def create_list():
+    creator_user_id = session.get("user_id")
+    if not creator_user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     description = (data.get("description") or "").strip() or None
 
     if not title:
         return jsonify({"error": "Title is required"}), 400
-
-    creator_user_id = session.get("user_id")
 
     lst = List(
         title=title,
@@ -69,9 +71,16 @@ def create_list():
 
 @list_bp.route("/<int:list_id>/albums", methods=["POST"])
 def add_album(list_id):
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Authentication required"}), 401
+
     lst = List.query.get(list_id)
     if not lst:
         return jsonify({"error": "List not found"}), 404
+
+    if lst.creator_user_id is None or lst.creator_user_id != uid:
+        return jsonify({"error": "Forbidden"}), 403
 
     data = request.get_json(silent=True) or {}
     album_id = data.get("albumId")
@@ -147,9 +156,16 @@ def fork_list(list_id):
 
 @list_bp.route("/<int:list_id>/albums/<int:album_id>", methods=["DELETE"])
 def remove_album(list_id, album_id):
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Authentication required"}), 401
+
     lst = List.query.get(list_id)
     if not lst:
         return jsonify({"error": "List not found"}), 404
+
+    if lst.creator_user_id is None or lst.creator_user_id != uid:
+        return jsonify({"error": "Forbidden"}), 403
 
     la = ListAlbum.query.filter_by(list_id=list_id, album_id=album_id).first()
     if la:

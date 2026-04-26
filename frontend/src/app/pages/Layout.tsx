@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
@@ -26,7 +26,7 @@ export default function Layout() {
       return;
     }
     const t = setTimeout(() =>
-      fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
+      apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
         .then((r) => r.json())
         .then(setSearchResults),
       300
@@ -126,7 +126,11 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.coverUrl} alt={a.title} className="w-8 h-8 object-cover flex-shrink-0" />
+                            <img
+                              src={a.coverUrl || a.artistImage}
+                              alt={a.title}
+                              className="w-8 h-8 object-cover flex-shrink-0"
+                            />
                             <div>
                               <p className="text-sm text-white">{a.title}</p>
                               <p className="text-xs text-[#999999]">{a.artistName}</p>
@@ -145,14 +149,18 @@ export default function Layout() {
               {user ? (
                 <>
                   {/* Avatar + name */}
-                  <div className="flex items-center gap-2">
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+                    aria-label="Open profile"
+                  >
                     <div className="w-7 h-7 rounded-sm bg-[#5b9dd9] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                       {user.displayName.charAt(0).toUpperCase()}
                     </div>
                     <span className="hidden sm:block text-sm text-white font-medium max-w-[120px] truncate">
                       {user.displayName}
                     </span>
-                  </div>
+                  </Link>
                   <button
                     onClick={logout}
                     aria-label="Sign out"

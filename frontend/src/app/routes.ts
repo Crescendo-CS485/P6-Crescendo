@@ -10,6 +10,7 @@ import CommunityPage from "./pages/CommunityPage";
 import ListsPage from "./pages/ListsPage";
 import ListDetailPage from "./pages/ListDetailPage";
 import StaticPage from "./pages/StaticPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "community", Component: CommunityPage },
       { path: "lists", Component: ListsPage },
       { path: "lists/:id", Component: ListDetailPage },
+      { path: "profile", Component: ProfilePage },
       { path: "info/:slug", Component: StaticPage },
     ],
   },

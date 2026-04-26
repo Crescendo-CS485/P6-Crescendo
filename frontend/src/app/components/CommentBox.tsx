@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Loader2, Send } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "./ui/button";
@@ -39,15 +39,10 @@ export function CommentBox({ discussionId, onSignInClick }: CommentBoxProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/discussions/${discussionId}/posts`, {
+      const res = await apiFetch(`${API_BASE}/api/discussions/${discussionId}/posts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body: body.trim(),
-          // STUB: pass user identity until real sessions are implemented
-          displayName: user!.displayName,
-          handle: user!.handle,
-        }),
+        body: JSON.stringify({ body: body.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to post comment");

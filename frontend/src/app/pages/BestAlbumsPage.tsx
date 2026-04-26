@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, LayoutGrid, List, Star, MessageSquare } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
@@ -39,6 +39,7 @@ const PER_PAGE = 12;
 
 // Inline list-view row component
 function AlbumRow({ album, rank }: { album: Album; rank: number }) {
+  const displayCover = album.coverUrl || album.artistImage;
   return (
     <Link
       to={`/artists/${album.artistId}`}
@@ -48,7 +49,7 @@ function AlbumRow({ album, rank }: { album: Album; rank: number }) {
         {rank}
       </span>
       <img
-        src={album.coverUrl}
+        src={displayCover}
         alt={album.title}
         className="w-12 h-12 object-cover flex-shrink-0"
       />
@@ -106,7 +107,7 @@ export default function BestAlbumsPage() {
   const { data, isLoading, isError, refetch } = useQuery<AlbumsResponse>({
     queryKey: ["albums", { timeRange, selectedGenres, sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?${params}`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch albums");
         return r.json();
       }),

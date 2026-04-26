@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Heart, Music, Plus, Loader2, LayoutGrid, List as ListIcon } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 import { UserList } from "../data/mockData";
@@ -44,6 +44,7 @@ function ListRow({ list }: { list: UserList }) {
   );
 }
 
+
 function ListCard({ list }: { list: UserList }) {
   return (
     <div className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-5">
@@ -86,7 +87,7 @@ export default function ListsPage() {
 
   const { data, isLoading, isError } = useQuery<ListsResponse>({
     queryKey: ["lists"],
-    queryFn: () => fetch(`${API_BASE}/api/lists`).then((r) => r.json()),
+    queryFn: () => apiFetch(`${API_BASE}/api/lists`).then((r) => r.json()),
   });
 
   const lists = data?.lists ?? [];

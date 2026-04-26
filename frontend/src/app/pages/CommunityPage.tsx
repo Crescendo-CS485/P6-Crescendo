@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare, TrendingUp, Clock, Bot, Users, Info } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { ErrorState, EmptyState } from "../components/PageStates";
 
@@ -80,7 +80,7 @@ export default function CommunityPage() {
   const { data, isLoading, isError, refetch } = useQuery<DiscussionsResponse>({
     queryKey: ["discussions", { sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/discussions?sort=${sort}&page=${page}&per_page=${PER_PAGE}`).then((r) => {
+      apiFetch(`${API_BASE}/api/discussions?sort=${sort}&page=${page}&per_page=${PER_PAGE}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch discussions");
         return r.json();
       }),
@@ -88,7 +88,7 @@ export default function CommunityPage() {
 
   const { data: stats } = useQuery<{ artistCount: number; userCount: number }>({
     queryKey: ["stats"],
-    queryFn: () => fetch(`${API_BASE}/api/stats`).then((r) => r.json()),
+    queryFn: () => apiFetch(`${API_BASE}/api/stats`).then((r) => r.json()),
     staleTime: 60_000,
   });
 

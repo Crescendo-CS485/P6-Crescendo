@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
@@ -74,7 +74,7 @@ export default function GenresPage() {
   } = useQuery<GenresResponse>({
     queryKey: ["album-genres"],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums/genres`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums/genres`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch genres");
         return r.json();
       }),
@@ -90,7 +90,7 @@ export default function GenresPage() {
   } = useQuery<AlbumsResponse>({
     queryKey: ["albums-by-genre", selectedGenre],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?genre=${encodeURIComponent(selectedGenre!)}&sort=user_score&per_page=50`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?genre=${encodeURIComponent(selectedGenre!)}&sort=user_score&per_page=50`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch albums");
         return r.json();
       }),

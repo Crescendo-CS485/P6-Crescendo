@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import { Discussion } from "../data/mockData";
 import { CommentList } from "../components/CommentList";
@@ -18,7 +18,7 @@ export default function DiscussionPage() {
   const { data, isLoading, isError } = useQuery<PostsResponse>({
     queryKey: ["discussion-meta", id],
     queryFn: () =>
-      fetch(`${API_BASE}/api/discussions/${id}/posts?per_page=1`).then((r) => {
+      apiFetch(`${API_BASE}/api/discussions/${id}/posts?per_page=1`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch discussion");
         return r.json();
       }),

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Star, MessageSquare, Music, LayoutGrid, List as ListIcon } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
@@ -90,7 +90,7 @@ export default function NewReleasesPage() {
   const { data, isLoading, isError, refetch } = useQuery<AlbumsResponse>({
     queryKey: ["albums-releases", { timeFilter }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?${params}`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch releases");
         return r.json();
       }),
@@ -209,9 +209,9 @@ export default function NewReleasesPage() {
                       className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors flex flex-col"
                     >
                       <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-                        {album.coverUrl ? (
+                        {(album.coverUrl || album.artistImage) ? (
                           <img
-                            src={album.coverUrl}
+                            src={album.coverUrl || album.artistImage}
                             alt={album.title}
                             className="w-full h-full object-cover"
                           />

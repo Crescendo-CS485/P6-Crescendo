@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+os.environ["ENABLE_DEBUG_ROUTES"] = "1"
 
 import pytest
 from unittest.mock import MagicMock, patch

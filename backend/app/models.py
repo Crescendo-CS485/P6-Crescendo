@@ -157,12 +157,15 @@ class Album(db.Model):
     def to_dict(self):
         rd = self.release_date
         formatted = f"{rd.strftime('%B')} {rd.day}, {rd.year}" if rd else None
+        # Fallback to the artist image when a specific album cover is unavailable.
+        resolved_cover_url = self.cover_url or (self.artist.image_url if self.artist else None)
         return {
             "id": str(self.id),
             "title": self.title,
             "artistId": str(self.artist_id),
             "artistName": self.artist.name if self.artist else None,
-            "coverUrl": self.cover_url,
+            "coverUrl": resolved_cover_url,
+            "artistImage": self.artist.image_url if self.artist else None,
             "releaseDate": formatted,
             "releaseYear": self.release_year,
             "userScore": self.user_score,

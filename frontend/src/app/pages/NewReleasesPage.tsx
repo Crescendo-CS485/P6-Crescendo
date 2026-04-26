@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Star, MessageSquare, Music } from "lucide-react";
+import { Star, MessageSquare, Music, LayoutGrid, List as ListIcon } from "lucide-react";
 import { API_BASE } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
@@ -16,6 +16,50 @@ interface AlbumsResponse {
 }
 
 type TimeFilter = "all-time" | "this-month" | "this-week" | "today" | "upcoming";
+type ViewMode = "grid" | "list";
+
+function AlbumRow({ album }: { album: Album }) {
+  return (
+    <Link
+      to={`/artists/${album.artistId}`}
+      className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3"
+    >
+      {album.coverUrl ? (
+        <img src={album.coverUrl} alt={album.title} className="w-12 h-12 object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Music className="w-6 h-6 text-[#444444]" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-bold text-white line-clamp-1 hover:text-[#5b9dd9] transition-colors">
+          {album.title}
+        </h3>
+        <p className="text-xs text-[#999999] line-clamp-1">{album.artistName}</p>
+        <div className="flex gap-1 mt-1">
+          {album.genres.slice(0, 2).map((g) => (
+            <span key={g} className="text-[10px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#666666] border border-[#333333] uppercase tracking-wide">
+              {g}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-6 flex-shrink-0 text-xs text-[#666666]">
+        <div className="hidden sm:flex items-center gap-1">
+          <Star className="w-3 h-3" />
+          <span>{album.reviewCount.toLocaleString()}</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1">
+          <MessageSquare className="w-3 h-3" />
+          <span>{album.discussionCount}</span>
+        </div>
+        <div className={`px-2.5 py-1 font-bold text-sm ${album.userScore >= 9 ? "bg-[#5b9dd9] text-white" : "bg-[#444444] text-white"}`}>
+          {album.userScore.toFixed(1)}
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 const TIME_FILTERS: { value: TimeFilter; label: string }[] = [
   { value: "all-time", label: "All Releases" },
@@ -36,6 +80,7 @@ function groupByDate(albums: Album[]): Record<string, Album[]> {
 
 export default function NewReleasesPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all-time");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   const params = new URLSearchParams();
   params.set("sort", "release_date");
@@ -78,6 +123,20 @@ export default function NewReleasesPage() {
             {albums.length} {albums.length === 1 ? "release" : "releases"} • Grouped by release date
           </p>
         </div>
+        <div className="flex border border-[#333333]">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-1.5 ${viewMode === "grid" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-1.5 ${viewMode === "list" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+          >
+            <ListIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -94,18 +153,26 @@ export default function NewReleasesPage() {
 
       {/* Loading */}
       {effectiveLoading && (
-        <div className="space-y-8">
-          {[1, 2].map((s) => (
-            <div key={s}>
-              <div className="h-5 w-40 bg-[#333333] rounded animate-pulse mb-3" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <AlbumCardSkeleton key={i} />
-                ))}
+        viewMode === "grid" ? (
+          <div className="space-y-8">
+            {[1, 2].map((s) => (
+              <div key={s}>
+                <div className="h-5 w-40 bg-[#333333] rounded animate-pulse mb-3" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <AlbumCardSkeleton key={i} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-16 bg-[#252525] border border-[#333333] animate-pulse" />
+            ))}
+          </div>
+        )
       )}
 
       {/* Empty */}
@@ -132,53 +199,61 @@ export default function NewReleasesPage() {
                 <div className="flex-1 border-t border-[#2a2a2a]" />
               </div>
 
-              {/* Albums grid for this date */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {grouped[dateKey].map((album) => (
-                  <Link
-                    key={album.id}
-                    to={`/artists/${album.artistId}`}
-                    className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors flex flex-col"
-                  >
-                    <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-                      {album.coverUrl ? (
-                        <img
-                          src={album.coverUrl}
-                          alt={album.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
-                          <Music className="w-12 h-12 text-[#444444]" />
-                        </div>
-                      )}
-                      <div
-                        className={`absolute top-2 right-2 px-2 py-1 font-bold text-sm ${
-                          album.userScore >= 9 ? "bg-[#5b9dd9] text-white" : "bg-[#444444] text-white"
-                        }`}
-                      >
-                        {album.userScore.toFixed(1)}
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <h3 className="text-sm font-bold text-white line-clamp-1 mb-0.5 hover:text-[#5b9dd9] transition-colors">
-                        {album.title}
-                      </h3>
-                      <p className="text-xs text-[#999999] line-clamp-1 mb-2">{album.artistName}</p>
-                      <div className="flex items-center justify-between text-[10px] text-[#666666]">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3" />
-                          <span>{album.reviewCount.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" />
-                          <span>{album.discussionCount}</span>
+              {/* Albums for this date */}
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {grouped[dateKey].map((album) => (
+                    <Link
+                      key={album.id}
+                      to={`/artists/${album.artistId}`}
+                      className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors flex flex-col"
+                    >
+                      <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
+                        {album.coverUrl ? (
+                          <img
+                            src={album.coverUrl}
+                            alt={album.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
+                            <Music className="w-12 h-12 text-[#444444]" />
+                          </div>
+                        )}
+                        <div
+                          className={`absolute top-2 right-2 px-2 py-1 font-bold text-sm ${
+                            album.userScore >= 9 ? "bg-[#5b9dd9] text-white" : "bg-[#444444] text-white"
+                          }`}
+                        >
+                          {album.userScore.toFixed(1)}
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                      <div className="p-3">
+                        <h3 className="text-sm font-bold text-white line-clamp-1 mb-0.5 hover:text-[#5b9dd9] transition-colors">
+                          {album.title}
+                        </h3>
+                        <p className="text-xs text-[#999999] line-clamp-1 mb-2">{album.artistName}</p>
+                        <div className="flex items-center justify-between text-[10px] text-[#666666]">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            <span>{album.reviewCount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{album.discussionCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {grouped[dateKey].map((album) => (
+                    <AlbumRow key={album.id} album={album} />
+                  ))}
+                </div>
+              )}
             </section>
           ))}
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Heart, Music, Plus, Loader2 } from "lucide-react";
+import { Heart, Music, Plus, Loader2, LayoutGrid, List as ListIcon } from "lucide-react";
 import { API_BASE } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
@@ -7,9 +7,41 @@ import { UserList } from "../data/mockData";
 import { CreateListModal } from "../components/CreateListModal";
 import { useAuth } from "../context/AuthContext";
 
+type ViewMode = "grid" | "list";
+
 interface ListsResponse {
   lists: UserList[];
   total: number;
+}
+
+function ListRow({ list }: { list: UserList }) {
+  return (
+    <div className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3">
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-bold text-white line-clamp-1 mb-0.5">{list.title}</h3>
+        <p className="text-xs text-[#5b9dd9] mb-1">by {list.createdBy}</p>
+        {list.description && (
+          <p className="text-xs text-[#999999] line-clamp-1">{list.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-4 flex-shrink-0 text-xs text-[#666666]">
+        <div className="hidden sm:flex items-center gap-1">
+          <Music className="w-3 h-3" />
+          <span>{list.albumCount}</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1">
+          <Heart className="w-3 h-3" />
+          <span>{list.likes}</span>
+        </div>
+        <Link
+          to={`/lists/${list.id}`}
+          className="text-xs px-3 py-1.5 bg-[#1a1a1a] border border-[#333333] text-[#999999] hover:text-white hover:border-[#5b9dd9] transition-colors rounded-sm"
+        >
+          View
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function ListCard({ list }: { list: UserList }) {
@@ -50,6 +82,7 @@ export default function ListsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   const { data, isLoading, isError } = useQuery<ListsResponse>({
     queryKey: ["lists"],
@@ -83,15 +116,31 @@ export default function ListsPage() {
             {effectiveLoading ? "Loading..." : `${data?.total ?? 0} curated lists`} • Community-built album collections
           </p>
         </div>
-        {user && (
-          <button
-            onClick={handleCreateClick}
-            className="flex items-center gap-2 px-4 py-2 bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white text-sm font-medium rounded-sm transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Create List
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex border border-[#333333]">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 ${viewMode === "grid" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 ${viewMode === "list" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+          </div>
+          {user && (
+            <button
+              onClick={handleCreateClick}
+              className="flex items-center gap-2 px-4 py-2 bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white text-sm font-medium rounded-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create List
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Loading */}
@@ -116,14 +165,22 @@ export default function ListsPage() {
         </div>
       )}
 
-      {/* Lists Grid */}
+      {/* Lists */}
       {effectiveSuccess && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-            {lists.map((list) => (
-              <ListCard key={list.id} list={list} />
-            ))}
-          </div>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+              {lists.map((list) => (
+                <ListCard key={list.id} list={list} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2 mb-10">
+              {lists.map((list) => (
+                <ListRow key={list.id} list={list} />
+              ))}
+            </div>
+          )}
 
           {/* Create List CTA Banner */}
           <div className="bg-gradient-to-r from-[#5b9dd9]/10 to-[#7c3aed]/10 border border-[#5b9dd9]/20 p-6 text-center">

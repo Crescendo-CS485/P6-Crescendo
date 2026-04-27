@@ -72,7 +72,7 @@ export default function ListDetailPage() {
     setLiking(false);
     setLocalLiked(null);
     setLocalLikeCount(null);
-  }, [id]);
+  }, [id, listQueryUser]);
 
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
     queryKey: ["list", id, listQueryUser],

@@ -48,11 +48,17 @@ function AlbumRow({ album, rank }: { album: Album; rank: number }) {
       <span className="text-lg font-bold text-[#444444] w-8 text-right flex-shrink-0">
         {rank}
       </span>
-      <img
-        src={displayCover}
-        alt={album.title}
-        className="w-12 h-12 object-cover flex-shrink-0"
-      />
+      {displayCover ? (
+        <img
+          src={displayCover}
+          alt={album.title}
+          className="w-12 h-12 object-cover flex-shrink-0"
+        />
+      ) : (
+        <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Music className="w-6 h-6 text-[#444444]" />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-bold text-white line-clamp-1 hover:text-[#5b9dd9] transition-colors">
           {album.title}

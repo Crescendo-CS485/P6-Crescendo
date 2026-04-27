@@ -344,3 +344,11 @@ PROMPT:
 
 RESPONSE:
 Addressed the newest frontend review set: removed empty-string image `src` fallbacks by rendering placeholders in `ArtistCard`, `ArtistPage` hero, `Layout` search dropdown rows, and `AddAlbumModal` covers; updated list detail invalidation to the full session-scoped key (`["list", id, listQueryUser]`); and fixed profile avatar initial fallback so empty display names resolve to `"U"`.
+
+---
+
+PROMPT:
+2 new comments
+
+RESPONSE:
+Updated `cleanup_discussions.py` so earliest post rewriting occurs only when the earliest post author is in `bot_ids` (no fallback rewrite when no bots exist). Updated `BestAlbumsPage` list-row cover rendering to show a placeholder block with `Music` icon when `displayCover` is missing instead of rendering an `<img>` with nullable src.

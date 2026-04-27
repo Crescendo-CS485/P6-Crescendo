@@ -90,13 +90,13 @@ def cleanup_discussions() -> dict[str, int]:
                 d.title = titles[idx]
                 updated_discussions += 1
 
-            # Update the earliest post in the discussion if it's a bot post
+            # Update only when earliest post author is a known bot.
             p = (
                 Post.query.filter_by(discussion_id=d.id, is_deleted=False)
                 .order_by(Post.id.asc())
                 .first()
             )
-            if p and (not bot_ids or p.author_user_id in bot_ids):
+            if p and p.author_user_id in bot_ids:
                 if idx < len(openers):
                     p.body = openers[idx]
                     updated_posts += 1

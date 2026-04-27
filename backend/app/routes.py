@@ -335,6 +335,8 @@ def create_album():
                 year = int(str(release_year).strip())
             except (TypeError, ValueError):
                 return jsonify({"error": "releaseYear must be a valid integer"}), 400
+    if year is not None and (year < 1 or year > 9999):
+        return jsonify({"error": "releaseYear must be between 1 and 9999"}), 400
     release_date = date(year, 1, 1) if year else None
     album = Album(
         title=title,

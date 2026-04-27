@@ -280,3 +280,11 @@ PROMPT:
 
 RESPONSE:
 Triaged the latest Copilot thread: fixed `create_album` so non-integer JSON floats (e.g. `2026.7`) cannot silently coerce via `int()` (restores failing CI test), added strict `artistId` parsing with 400s, aligned `FilterBar` grid column counting with when the genre section actually renders, made `ListsPage` lists query throw on non-OK responses, added missing grid/list `aria-label`/`title` on `BestAlbumsPage`, and added a route test for invalid `artistId` values.
+
+---
+
+PROMPT:
+3 new comments
+
+RESPONSE:
+Addressed the latest Copilot trio: `create_album` now rejects `releaseYear` outside 1–9999 before building `date()` (avoids 500s from `ValueError`), `Artist.to_dict()` uses a SQL `COUNT` for `discussionCount` instead of `len(self.discussions)` so counting does not load the full discussion collection, list like/fork tests assert `201` after `POST /api/lists`, and added `test_release_year_out_of_range_returns_400`.

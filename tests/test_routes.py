@@ -647,6 +647,25 @@ class TestCreateAlbum:
             })
             assert resp.status_code == 400
 
+    def test_release_year_out_of_range_returns_400(self, client, app, make_artist):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        artist = make_artist(name="Range Artist")
+        db.session.commit()
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Range Validator",
+            "handle": "range_validator",
+            "email": "range_validator@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+        for bad in (0, -1, 10000):
+            resp = client.post("/api/albums", json={
+                "title": "Bad Range",
+                "artistId": str(artist.id),
+                "releaseYear": bad,
+            })
+            assert resp.status_code == 400
+
     def test_invalid_artist_id_returns_400(self, client, app, make_artist):
         app.config["ENABLE_CATALOG_WRITE"] = True
         artist = make_artist(name="ArtistId Artist")
@@ -1000,6 +1019,7 @@ class TestListLike:
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
         r = client.post("/api/lists", json={"title": "Likeable"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         with client.session_transaction() as sess:
             sess.clear()
@@ -1020,6 +1040,7 @@ class TestListLike:
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
         r = client.post("/api/lists", json={"title": "L-Like"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         resp = client.post(f"/api/lists/{list_id}/like")
         assert resp.status_code == 200
@@ -1033,6 +1054,7 @@ class TestListLike:
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
         r = client.post("/api/lists", json={"title": "L-Toggle"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         client.post(f"/api/lists/{list_id}/like")  # like
         resp = client.post(f"/api/lists/{list_id}/like")  # unlike
@@ -1051,6 +1073,7 @@ class TestListFork:
         with client.session_transaction() as sess:
             sess["user_id"] = u.id
         r = client.post("/api/lists", json={"title": "Source List"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         with client.session_transaction() as sess:
             sess.clear()
@@ -1075,6 +1098,7 @@ class TestListFork:
         with client.session_transaction() as sess:
             sess["user_id"] = owner.id
         r = client.post("/api/lists", json={"title": "Original"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
 
@@ -1096,6 +1120,7 @@ class TestListFork:
         with client.session_transaction() as sess:
             sess["user_id"] = owner.id
         r = client.post("/api/lists", json={"title": "WithAlbums"})
+        assert r.status_code == 201
         list_id = r.get_json()["list"]["id"]
         client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
 

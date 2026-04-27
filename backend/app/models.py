@@ -34,6 +34,12 @@ class Artist(db.Model):
     )
 
     def to_dict(self):
+        discussion_count = (
+            db.session.query(func.count(Discussion.id))
+            .filter(Discussion.artist_id == self.id)
+            .scalar()
+            or 0
+        )
         latest_disc = (
             max(self.discussions, key=lambda d: d.last_activity_at)
             if self.discussions else None
@@ -51,7 +57,7 @@ class Artist(db.Model):
             "image": self.image_url,
             "bio": self.bio,
             "activityScore": self.activity_score,
-            "discussionCount": len(self.discussions),
+            "discussionCount": discussion_count,
             "listenerCount": listener_count,
             "latestThread": {
                 "id": str(latest_disc.id) if latest_disc else None,

@@ -96,6 +96,10 @@ export default function ListDetailPage() {
 
   async function handleLike() {
     if (!user) return;
+    if (!id) {
+      toast.error("Missing list id");
+      return;
+    }
     setLiking(true);
     const prevLiked = localLiked;
     const prevCount = localLikeCount;

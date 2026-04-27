@@ -61,7 +61,7 @@ export interface Album {
 export interface UserList {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   createdBy: string;
   creatorUserId: string | null;
   albumCount: number;

@@ -59,9 +59,11 @@ function ListCard({ list }: { list: UserList }) {
         </div>
       </div>
 
-      <p className="text-sm text-[#999999] leading-relaxed mb-4 line-clamp-3">
-        {list.description}
-      </p>
+      {list.description ? (
+        <p className="text-sm text-[#999999] leading-relaxed mb-4 line-clamp-3">
+          {list.description}
+        </p>
+      ) : null}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-[#666666]">

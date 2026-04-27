@@ -208,13 +208,20 @@ export default function ListDetailPage() {
               </div>
               {user ? (
                 <button
+                  type="button"
                   onClick={handleLike}
                   disabled={liking}
+                  aria-pressed={localLiked}
+                  aria-label={
+                    localLiked
+                      ? `Unlike this list, ${localLikeCount} likes`
+                      : `Like this list, ${localLikeCount} likes`
+                  }
                   className={`flex items-center gap-1.5 transition-colors ${localLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"}`}
                   title={localLiked ? "Unlike" : "Like"}
                 >
-                  <Heart className={`w-4 h-4 ${localLiked ? "fill-current" : ""}`} />
-                  <span>{localLikeCount}</span>
+                  <Heart className={`w-4 h-4 ${localLiked ? "fill-current" : ""}`} aria-hidden="true" />
+                  <span aria-hidden="true">{localLikeCount}</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5 text-[#666666]">

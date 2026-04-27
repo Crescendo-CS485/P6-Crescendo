@@ -360,3 +360,11 @@ PROMPT:
 
 RESPONSE:
 Updated `FilterBar` time-range select safety: derive `safeSelectedTimeRange` from `selectedTimeRange ?? fallbackTimeRange`, where fallback prefers `defaultTimeRange` only if present in current options and otherwise uses the first option value. This prevents controlled/uncontrolled mismatch when `onTimeRangeChange` is provided without `selectedTimeRange`.
+
+---
+
+PROMPT:
+2 new comments
+
+RESPONSE:
+Typed `UserList.description` as `string | null` in `mockData.ts` to match the API. `ListsPage` list cards and `ProfilePage` list previews render the description paragraph only when present. On `ListDetailPage`, the like control now uses `type="button"`, `aria-pressed`, an `aria-label` that includes like/unlike state and count, and `aria-hidden` on the icon and numeric span so assistive tech does not double-announce.

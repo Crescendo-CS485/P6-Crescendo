@@ -214,7 +214,9 @@ export default function ProfilePage() {
                     <span>{l.likes}</span>
                   </div>
                 </div>
-                <p className="text-xs text-[#999999] leading-relaxed line-clamp-2">{l.description}</p>
+                {l.description ? (
+                  <p className="text-xs text-[#999999] leading-relaxed line-clamp-2">{l.description}</p>
+                ) : null}
               </Link>
             ))}
           </div>

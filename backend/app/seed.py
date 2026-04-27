@@ -1190,6 +1190,7 @@ SPOTLIGHT_FILTER_GENRES = [
     "Folk",
     "Dance",
     "Alternative",
+    "R&B",
 ]
 
 

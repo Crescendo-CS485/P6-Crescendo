@@ -24,8 +24,10 @@ def _artist_list_counts_by_id(artist_ids):
             func.count(func.distinct(Post.author_user_id)),
         )
         .join(Post, Post.discussion_id == Discussion.id)
+        .join(User, User.id == Post.author_user_id)
         .filter(Discussion.artist_id.in_(artist_ids))
         .filter(Post.is_deleted.is_(False))
+        .filter(User.is_bot.is_(False))
         .group_by(Discussion.artist_id)
         .all()
     )

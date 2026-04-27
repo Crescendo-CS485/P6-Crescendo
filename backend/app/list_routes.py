@@ -112,9 +112,7 @@ def toggle_like(list_id):
     if not lst:
         return jsonify({"error": "List not found"}), 404
 
-    existing = db.session.execute(
-        db.select(ListLike).filter_by(list_id=list_id, user_id=user_id)
-    ).scalar_one_or_none()
+    existing = ListLike.query.filter_by(list_id=list_id, user_id=user_id).first()
 
     if existing:
         db.session.delete(existing)

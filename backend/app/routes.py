@@ -550,6 +550,7 @@ def get_stats():
         "postCount": post_count,
         "botCount": bot_count,
         "userCount": user_count,
+        "catalogWriteEnabled": bool(current_app.config.get("ENABLE_CATALOG_WRITE")),
     })
 
 

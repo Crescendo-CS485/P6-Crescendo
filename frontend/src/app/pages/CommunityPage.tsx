@@ -86,7 +86,11 @@ export default function CommunityPage() {
       }),
   });
 
-  const { data: stats } = useQuery<{ artistCount: number; userCount: number }>({
+  const { data: stats } = useQuery<{
+    artistCount: number;
+    userCount: number;
+    catalogWriteEnabled?: boolean;
+  }>({
     queryKey: ["stats"],
     queryFn: async () => {
       try {

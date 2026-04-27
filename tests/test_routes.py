@@ -788,6 +788,13 @@ class TestGetStats:
         assert data["botCount"] == 1
         assert data["discussionCount"] == 1
         assert data["postCount"] == 2
+        assert data["catalogWriteEnabled"] is False
+
+    def test_catalog_write_flag_reflects_config(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        r = client.get("/api/stats")
+        assert r.status_code == 200
+        assert r.get_json()["catalogWriteEnabled"] is True
 
 
 # ── GET /api/search ─────────────────────────────────────────────────────

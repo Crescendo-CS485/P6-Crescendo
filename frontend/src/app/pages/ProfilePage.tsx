@@ -15,6 +15,15 @@ interface ListsResponse {
   total: number;
 }
 
+interface StatsResponse {
+  artistCount: number;
+  discussionCount: number;
+  postCount: number;
+  botCount: number;
+  userCount: number;
+  catalogWriteEnabled: boolean;
+}
+
 export default function ProfilePage() {
   const { user, isLoading, authError, retryAuthCheck, logout } = useAuth();
   const navigate = useNavigate();
@@ -36,6 +45,17 @@ export default function ProfilePage() {
       }),
     enabled: Boolean(user),
     staleTime: 30_000,
+  });
+
+  const { data: statsData, isLoading: statsLoading } = useQuery<StatsResponse>({
+    queryKey: ["stats"],
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/stats`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load stats");
+        return r.json();
+      }),
+    enabled: Boolean(user),
+    staleTime: 60_000,
   });
 
   const onArtistCreated = useCallback(() => {
@@ -78,6 +98,8 @@ export default function ProfilePage() {
   }
 
   const initial = user.displayName?.trim().charAt(0).toUpperCase() || "U";
+  const catalogWriteEnabled =
+    !statsLoading && Boolean(statsData?.catalogWriteEnabled);
 
   const allLists = listsData?.lists ?? [];
   const yourLists = allLists.filter((l) => l.creatorUserId === user.id);
@@ -91,7 +113,8 @@ export default function ProfilePage() {
           <h1 className="text-2xl font-bold text-white mb-1">Your Profile</h1>
           <p className="text-sm text-[#999999]">Account and list activity.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button asChild className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm">
             <Link to="/lists">
               <ListMusic className="w-4 h-4 mr-2" />
@@ -100,14 +123,26 @@ export default function ProfilePage() {
           </Button>
           <Button
             onClick={() => setAddArtistOpen(true)}
-            className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm"
+            disabled={!catalogWriteEnabled}
+            title={
+              catalogWriteEnabled
+                ? undefined
+                : "Adding artists is disabled in this environment (catalog write off)."
+            }
+            className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm disabled:opacity-50"
           >
             <Plus className="w-4 h-4 mr-2" />
             Artist
           </Button>
           <Button
             onClick={() => setAddAlbumOpen(true)}
-            className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm"
+            disabled={!catalogWriteEnabled}
+            title={
+              catalogWriteEnabled
+                ? undefined
+                : "Adding albums is disabled in this environment (catalog write off)."
+            }
+            className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm disabled:opacity-50"
           >
             <Plus className="w-4 h-4 mr-2" />
             Album
@@ -119,6 +154,12 @@ export default function ProfilePage() {
             <LogOut className="w-4 h-4 mr-2" />
             Sign out
           </Button>
+          </div>
+          {!statsLoading && statsData && !statsData.catalogWriteEnabled && (
+            <p className="text-[10px] text-[#666666] max-w-md text-right">
+              Artist and album creation require catalog write to be enabled on the server.
+            </p>
+          )}
         </div>
       </div>
 

@@ -16,7 +16,7 @@ interface ListsResponse {
 }
 
 export default function ProfilePage() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, authError, retryAuthCheck, logout } = useAuth();
   const navigate = useNavigate();
   const [addArtistOpen, setAddArtistOpen] = useState(false);
   const [addAlbumOpen, setAddAlbumOpen] = useState(false);
@@ -26,6 +26,17 @@ export default function ProfilePage() {
   }
 
   if (!user) {
+    if (authError) {
+      return (
+        <div className="max-w-[1000px] mx-auto px-4 sm:px-6 py-10">
+          <ErrorState
+            title="Could not verify your session"
+            message="The server may be temporarily unavailable. You can try again without signing out."
+            onRetry={() => void retryAuthCheck()}
+          />
+        </div>
+      );
+    }
     return (
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 py-10">
         <EmptyState

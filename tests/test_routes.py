@@ -123,6 +123,26 @@ class TestGetArtists:
         payload = r.get_json()["artists"][0]
         assert payload["listenerCount"] == 1
 
+    def test_list_latest_thread_matches_most_recent_discussion(
+        self, client, make_artist, make_user, make_discussion
+    ):
+        artist = make_artist(name="LatestListHost")
+        u = make_user()
+        make_discussion(
+            artist.id, u.id, title="Older",
+            last_activity_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        newer = make_discussion(
+            artist.id, u.id, title="NewerRow",
+            last_activity_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+        db.session.commit()
+        r = client.get("/api/artists")
+        assert r.status_code == 200
+        row = next(a for a in r.get_json()["artists"] if a["name"] == "LatestListHost")
+        assert row["latestThread"]["id"] == str(newer.id)
+        assert row["latestThread"]["title"] == "NewerRow"
+
 
 # ── GET /api/artists/<id> ──────────────────────────────────────────────
 

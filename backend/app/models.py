@@ -34,11 +34,12 @@ class Artist(db.Model):
     )
 
     def to_dict(self, *, list_counts=None):
-        """list_counts: optional {"discussion": int, "listeners": int} from a batched
-        query (e.g. GET /api/artists) to avoid N+1 aggregate queries per artist."""
+        """list_counts: optional dict from batched list/search queries with keys
+        discussion, listeners, latestThread — avoids N+1 counts and lazy discussion loads."""
         if list_counts is not None:
             discussion_count = list_counts["discussion"]
             listener_count = list_counts["listeners"]
+            latest_thread = list_counts["latestThread"]
         else:
             discussion_count = (
                 db.session.query(func.count(Discussion.id))
@@ -54,10 +55,15 @@ class Artist(db.Model):
                 .scalar()
                 or 0
             )
-        latest_disc = (
-            max(self.discussions, key=lambda d: d.last_activity_at)
-            if self.discussions else None
-        )
+            latest_disc = (
+                max(self.discussions, key=lambda d: d.last_activity_at)
+                if self.discussions else None
+            )
+            latest_thread = {
+                "id": str(latest_disc.id) if latest_disc else None,
+                "title": latest_disc.title if latest_disc else None,
+                "timestamp": latest_disc.last_activity_at.isoformat() if latest_disc else None,
+            }
         return {
             "id": str(self.id),
             "name": self.name,
@@ -66,11 +72,7 @@ class Artist(db.Model):
             "activityScore": self.activity_score,
             "discussionCount": discussion_count,
             "listenerCount": listener_count,
-            "latestThread": {
-                "id": str(latest_disc.id) if latest_disc else None,
-                "title": latest_disc.title if latest_disc else None,
-                "timestamp": latest_disc.last_activity_at.isoformat() if latest_disc else None,
-            },
+            "latestThread": latest_thread,
             "genres": [g.name for g in self.genres],
         }
 

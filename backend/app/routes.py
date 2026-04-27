@@ -33,6 +33,41 @@ def _artist_list_counts_by_id(artist_ids):
     return disc, lstn
 
 
+def _artist_latest_thread_payload_by_id(artist_ids):
+    """Per artist: latest discussion by last_activity_at (id tie-break). One grouped query + one join."""
+    empty = {"id": None, "title": None, "timestamp": None}
+    if not artist_ids:
+        return {}, empty
+    mx_sub = (
+        db.session.query(
+            Discussion.artist_id.label("aid"),
+            func.max(Discussion.last_activity_at).label("mx"),
+        )
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .group_by(Discussion.artist_id)
+        .subquery()
+    )
+    candidates = (
+        db.session.query(Discussion)
+        .join(mx_sub, Discussion.artist_id == mx_sub.c.aid)
+        .filter(Discussion.last_activity_at == mx_sub.c.mx)
+        .all()
+    )
+    best = {}
+    for d in candidates:
+        cur = best.get(d.artist_id)
+        if cur is None or d.id > cur.id:
+            best[d.artist_id] = d
+    return {
+        int(aid): {
+            "id": str(d.id),
+            "title": d.title,
+            "timestamp": d.last_activity_at.isoformat() if d.last_activity_at else None,
+        }
+        for aid, d in best.items()
+    }, empty
+
+
 @bp.route("/artists")
 def get_artists():
     """Return paginated artist list with optional active_discussions, genre, and sort filters."""
@@ -70,11 +105,13 @@ def get_artists():
     items = paginated.items
     ids = [a.id for a in items]
     disc_map, listen_map = _artist_list_counts_by_id(ids)
+    latest_map, latest_empty = _artist_latest_thread_payload_by_id(ids)
     artists_out = [
         a.to_dict(
             list_counts={
                 "discussion": disc_map.get(a.id, 0),
                 "listeners": listen_map.get(a.id, 0),
+                "latestThread": latest_map.get(a.id, latest_empty),
             }
         )
         for a in items
@@ -484,6 +521,7 @@ def search():
     albums = Album.query.filter(Album.title.ilike(pattern)).limit(5).all()
     a_ids = [a.id for a in artists]
     disc_map, listen_map = _artist_list_counts_by_id(a_ids)
+    latest_map, latest_empty = _artist_latest_thread_payload_by_id(a_ids)
 
     return jsonify({
         "artists": [
@@ -491,6 +529,7 @@ def search():
                 list_counts={
                     "discussion": disc_map.get(a.id, 0),
                     "listeners": listen_map.get(a.id, 0),
+                    "latestThread": latest_map.get(a.id, latest_empty),
                 }
             )
             for a in artists

@@ -75,6 +75,20 @@ export function CreateAlbumModal({ isOpen, onClose, onCreated }: CreateAlbumModa
     e.preventDefault();
     if (!title.trim() || !artistId) return;
     setError(null);
+    const trimmedYear = releaseYear.trim();
+    let releaseYearPayload: number | undefined;
+    if (trimmedYear) {
+      if (!/^\d+$/.test(trimmedYear)) {
+        setError("Release year must be a whole number (e.g. 2026).");
+        return;
+      }
+      const y = parseInt(trimmedYear, 10);
+      if (y < 1 || y > 9999) {
+        setError("Release year must be between 1 and 9999.");
+        return;
+      }
+      releaseYearPayload = y;
+    }
     setIsSubmitting(true);
     try {
       const res = await apiFetch(`${API_BASE}/api/albums`, {
@@ -83,7 +97,7 @@ export function CreateAlbumModal({ isOpen, onClose, onCreated }: CreateAlbumModa
         body: JSON.stringify({
           title: title.trim(),
           artistId,
-          releaseYear: releaseYear.trim() ? Number(releaseYear.trim()) : undefined,
+          releaseYear: releaseYearPayload,
           albumType,
           coverUrl: coverUrl.trim() || undefined,
           genres: genres

@@ -137,6 +137,7 @@ describe("DiscoveryPage", () => {
   test("renders loading state without artist content or errors", () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     renderPage();
+    expect(screen.getByText(/loading artists/i)).toBeInTheDocument();
     expect(screen.queryByText("API Connection Error")).not.toBeInTheDocument();
     expect(screen.queryByText("Luna Rivera")).not.toBeInTheDocument();
   });

@@ -45,7 +45,10 @@ export function AddAlbumModal({
   const { data, isLoading } = useQuery<AlbumsResponse>({
     queryKey: ["albums-picker"],
     queryFn: () =>
-      apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => r.json()),
+      apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load albums");
+        return r.json();
+      }),
     enabled: isOpen,
     staleTime: 60_000,
   });
@@ -130,7 +133,7 @@ export function AddAlbumModal({
               >
                 {/* Cover */}
                 <img
-                  src={album.coverUrl || album.artistImage}
+                  src={album.coverUrl || album.artistImage || ""}
                   alt={album.title}
                   className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
                 />

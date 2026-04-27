@@ -27,8 +27,8 @@ export interface Discussion {
 export interface Artist {
   id: string;
   name: string;
-  image: string;
-  bio: string;
+  image: string | null;
+  bio: string | null;
   activityScore: number;
   discussionCount: number;
   listenerCount: number;
@@ -45,10 +45,10 @@ export interface Album {
   title: string;
   artistId: string;
   artistName: string;
-  coverUrl: string;
-  artistImage?: string;
-  releaseDate: string;
-  releaseYear: number;
+  coverUrl: string | null;
+  artistImage?: string | null;
+  releaseDate: string | null;
+  releaseYear: number | null;
   userScore: number;
   criticScore: number | null;
   reviewCount: number;

@@ -328,3 +328,11 @@ PROMPT:
 
 RESPONSE:
 React Query keys for session-dependent list data now include the current user id (`ListsPage`, `ProfilePage` lists, `ListDetailPage` detail). `GET /api/albums/genres` uses `joinedload(Genre.albums).joinedload(Album.artist)` to avoid N+1 when resolving cover fallbacks to artist images. `ArtistPage` trigger button stays enabled when signed out so the toast path runs; only `triggering` disables the control.
+
+---
+
+PROMPT:
+6 new comments
+
+RESPONSE:
+Updated frontend API hardening and contracts: search in `Layout` now checks `r.ok` before parsing JSON and clears results on failure; `AddAlbumModal` albums query throws on non-OK responses; `mockData` interfaces now allow nullable `Artist.image`/`bio` and nullable `Album.coverUrl`/`artistImage`/`releaseDate`/`releaseYear` to match backend responses. Added fallback rendering for nullable images/bio in `ArtistCard`, `ArtistPage`, search dropdown, and album picker image srcs. Adjusted `DiscoveryPage` loading test to assert a positive loading indicator and updated integration spec trigger-row text to reflect signed-out click+toast behavior.

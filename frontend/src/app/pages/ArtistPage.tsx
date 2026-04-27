@@ -121,7 +121,7 @@ export default function ArtistPage() {
           {/* Hero */}
           <div className="flex gap-6 mb-8">
             <div className="w-40 h-40 flex-shrink-0 overflow-hidden border border-[#333333]">
-              <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
+              <img src={artist.image || ""} alt={artist.name} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap gap-1 mb-2">
@@ -135,7 +135,7 @@ export default function ArtistPage() {
                 ))}
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">{artist.name}</h1>
-              <p className="text-sm text-[#999999] mb-4 leading-relaxed">{artist.bio}</p>
+              <p className="text-sm text-[#999999] mb-4 leading-relaxed">{artist.bio ?? "No artist bio available."}</p>
               <div className="flex items-center gap-6 text-sm">
                 <div>
                   <span className="text-[#666666]">Activity</span>

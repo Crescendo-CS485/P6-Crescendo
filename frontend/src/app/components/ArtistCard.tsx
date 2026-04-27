@@ -11,6 +11,7 @@ interface ArtistCardProps {
 export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
   const navigate = useNavigate();
   const isHighActivity = artist.activityScore >= 8.5;
+  const imageSrc = artist.image || "";
 
   return (
     <Link
@@ -20,7 +21,7 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
       {/* Artist Image - Square */}
       <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
         <img
-          src={artist.image}
+          src={imageSrc}
           alt={artist.name}
           className="w-full h-full object-cover"
         />
@@ -62,7 +63,7 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
 
         {/* Bio */}
         <p className="text-xs text-[#999999] line-clamp-3 mb-3 flex-1">
-          {artist.bio}
+          {artist.bio ?? "No bio yet."}
         </p>
 
         {/* Stats */}

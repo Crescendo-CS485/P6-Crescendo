@@ -25,12 +25,15 @@ export default function Layout() {
       setSearchResults(null);
       return;
     }
-    const t = setTimeout(() =>
+    const t = setTimeout(() => {
       apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
-        .then((r) => r.json())
-        .then(setSearchResults),
-      300
-    );
+        .then(async (r) => {
+          if (!r.ok) throw new Error("Search failed");
+          return r.json();
+        })
+        .then(setSearchResults)
+        .catch(() => setSearchResults(null));
+    }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
@@ -110,7 +113,7 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            <img src={a.image ?? ""} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
                             <span className="text-sm text-white">{a.name}</span>
                           </Link>
                         ))}
@@ -127,7 +130,7 @@ export default function Layout() {
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
                             <img
-                              src={a.coverUrl || a.artistImage}
+                              src={a.coverUrl || a.artistImage || ""}
                               alt={a.title}
                               className="w-8 h-8 object-cover flex-shrink-0"
                             />

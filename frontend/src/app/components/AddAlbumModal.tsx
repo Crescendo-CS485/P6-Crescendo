@@ -42,7 +42,7 @@ export function AddAlbumModal({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  const { data, isLoading } = useQuery<AlbumsResponse>({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<AlbumsResponse>({
     queryKey: ["albums-picker"],
     queryFn: () =>
       apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => {
@@ -111,18 +111,33 @@ export function AddAlbumModal({
 
         {/* Album list */}
         <div className="overflow-y-auto flex-1 px-6 py-3 space-y-1">
-          {isLoading && (
+          {(isLoading || isFetching) && (
             <div className="flex items-center justify-center py-12 text-[#666666]">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               <span className="text-sm">Loading albums...</span>
             </div>
           )}
 
-          {!isLoading && filtered.length === 0 && (
+          {isError && (
+            <div className="py-10 text-center">
+              <p className="text-sm text-[#999999]">
+                Couldn’t load albums{error instanceof Error && error.message ? `: ${error.message}` : "."}
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-3 inline-flex items-center justify-center px-3 py-1.5 text-sm bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !isFetching && !isError && filtered.length === 0 && (
             <p className="text-center text-sm text-[#666666] py-10">No albums found.</p>
           )}
 
-          {filtered.map((album) => {
+          {!isError && filtered.map((album) => {
             const isAdded = added.has(album.id);
             const isAddingThis = adding === album.id;
 

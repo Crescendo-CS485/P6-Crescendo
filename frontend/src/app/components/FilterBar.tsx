@@ -51,6 +51,11 @@ export function FilterBar({
   };
 
   const resolvedTimeRangeOptions = timeRangeOptions ?? timeRanges;
+  const availableTimeRangeValues = new Set(resolvedTimeRangeOptions.map((opt) => opt.value));
+  const fallbackTimeRange = availableTimeRangeValues.has(defaultTimeRange)
+    ? defaultTimeRange
+    : (resolvedTimeRangeOptions[0]?.value ?? "all");
+  const safeSelectedTimeRange = selectedTimeRange ?? fallbackTimeRange;
   const showGenreSection = Boolean(onGenresChange && selectedGenres !== undefined);
   const sectionCount = [
     !!onActiveDiscussionsChange,
@@ -142,7 +147,7 @@ export function FilterBar({
             {onTimeRangeChange && (
               <div className="space-y-2">
                 <Label className="text-xs text-[#999999] uppercase tracking-wide">Time Range</Label>
-                <Select value={selectedTimeRange} onValueChange={onTimeRangeChange}>
+                <Select value={safeSelectedTimeRange} onValueChange={onTimeRangeChange}>
                   <SelectTrigger className="bg-[#1a1a1a] border-[#333333] text-white rounded-sm h-[52px]">
                     <SelectValue placeholder="Select time range" />
                   </SelectTrigger>

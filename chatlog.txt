@@ -352,3 +352,11 @@ PROMPT:
 
 RESPONSE:
 Updated `cleanup_discussions.py` so earliest post rewriting occurs only when the earliest post author is in `bot_ids` (no fallback rewrite when no bots exist). Updated `BestAlbumsPage` list-row cover rendering to show a placeholder block with `Music` icon when `displayCover` is missing instead of rendering an `<img>` with nullable src.
+
+---
+
+PROMPT:
+1 comment
+
+RESPONSE:
+Updated `FilterBar` time-range select safety: derive `safeSelectedTimeRange` from `selectedTimeRange ?? fallbackTimeRange`, where fallback prefers `defaultTimeRange` only if present in current options and otherwise uses the first option value. This prevents controlled/uncontrolled mismatch when `onTimeRangeChange` is provided without `selectedTimeRange`.

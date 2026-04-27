@@ -61,6 +61,9 @@ def clean_tables(app):
         LLMJob, Post, ListAlbum, ListLike, List, Discussion,
         LLMPersona, Album, User, Artist, Genre,
     )
+    # A test may leave the session in a failed/expired state; reset it before cleanup.
+    db.session.rollback()
+    db.session.expunge_all()
     # Order matters: children before parents
     db.session.query(LLMJob).delete()
     db.session.query(Post).delete()

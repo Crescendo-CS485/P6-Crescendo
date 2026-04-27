@@ -264,3 +264,11 @@ PROMPT:
 
 RESPONSE:
 Triaged the 4 new PR comments and applied fixes: `create_album` now validates `releaseYear` (returns 400 on invalid values), `listenerCount` excludes soft-deleted posts, and backend tests were expanded for `POST /api/artists` and `POST /api/albums` covering success plus key failure paths. Could not run pytest locally because `pytest` is not installed in the current environment; no linter issues in edited files.
+
+---
+
+PROMPT:
+4 new comments, please baby sit this.
+
+RESPONSE:
+After pushing the initial fixes for the 4 new comments, CI backend tests failed due to a SQLAlchemy session rollback cascade during test cleanup. Updated `tests/conftest.py` cleanup fixture to `rollback()` and `expunge_all()` before table deletes so failed/expired session state does not poison subsequent tests.

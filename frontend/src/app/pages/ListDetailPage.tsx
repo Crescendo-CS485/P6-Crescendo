@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { ArrowLeft, Heart, Music, Loader2, Plus, X, Copy, LayoutGrid, List as ListIcon } from "lucide-react";
 import { AlbumCard } from "../components/AlbumCard";
@@ -12,13 +13,14 @@ import { UserListDetail, Album } from "../data/mockData";
 type ViewMode = "grid" | "list";
 
 function AlbumRow({ album }: { album: Album }) {
+  const displayCover = album.coverUrl || album.artistImage;
   return (
     <Link
       to={`/artists/${album.artistId}`}
       className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3"
     >
-      {album.coverUrl ? (
-        <img src={album.coverUrl} alt={album.title} className="w-12 h-12 object-cover flex-shrink-0" />
+      {displayCover ? (
+        <img src={displayCover} alt={album.title} className="w-12 h-12 object-cover flex-shrink-0" />
       ) : (
         <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
           <Music className="w-6 h-6 text-[#444444]" />
@@ -111,9 +113,21 @@ export default function ListDetailPage() {
     setForking(true);
     try {
       const res = await apiFetch(`${API_BASE}/api/lists/${id}/fork`, { method: "POST" });
-      if (!res.ok) return;
-      const result = await res.json();
+      if (!res.ok) {
+        let message = `Could not copy this list (${res.status})`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          /* non-JSON error body */
+        }
+        toast.error(message);
+        return;
+      }
+      const result = (await res.json()) as { list: { id: string } };
       navigate(`/lists/${result.list.id}`);
+    } catch {
+      toast.error("Network error — could not reach the server");
     } finally {
       setForking(false);
     }

@@ -19,13 +19,14 @@ type TimeFilter = "all-time" | "this-month" | "this-week" | "today" | "upcoming"
 type ViewMode = "grid" | "list";
 
 function AlbumRow({ album }: { album: Album }) {
+  const displayCover = album.coverUrl || album.artistImage;
   return (
     <Link
       to={`/artists/${album.artistId}`}
       className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3"
     >
-      {album.coverUrl ? (
-        <img src={album.coverUrl} alt={album.title} className="w-12 h-12 object-cover flex-shrink-0" />
+      {displayCover ? (
+        <img src={displayCover} alt={album.title} className="w-12 h-12 object-cover flex-shrink-0" />
       ) : (
         <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
           <Music className="w-6 h-6 text-[#444444]" />

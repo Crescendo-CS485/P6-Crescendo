@@ -29,6 +29,11 @@ jest.mock("../frontend/src/app/context/AuthContext", () => ({
   }),
 }));
 
+jest.mock("sonner", () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
+
+import { toast } from "sonner";
 import ListDetailPage from "../frontend/src/app/pages/ListDetailPage";
 
 function makeAlbum(overrides: Record<string, unknown> = {}) {
@@ -89,6 +94,7 @@ describe("ListDetailPage", () => {
     fetchMock = jest.fn();
     global.fetch = fetchMock;
     mockNavigate.mockClear();
+    jest.mocked(toast.error).mockClear();
   });
 
   test("like button calls API and updates count from server response", async () => {
@@ -205,5 +211,36 @@ describe("ListDetailPage", () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/lists/99");
     });
+  });
+
+  test("fork failure shows toast and does not navigate", async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (typeof url === "string" && url.includes("/api/lists/1/fork") && init?.method === "POST") {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          json: async () => ({ error: "Sign in to copy a list" }),
+        });
+      }
+      if (typeof url === "string" && url.includes("/api/lists/1") && !url.includes("/fork")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ list: makeList() }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+
+    renderPage();
+    await waitFor(() => screen.getByRole("button", { name: "Add Albums" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Albums" }));
+    await screen.findByText(/don't own this list/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Copy" }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Sign in to copy a list");
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

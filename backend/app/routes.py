@@ -7,6 +7,32 @@ from . import db
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
+def _artist_list_counts_by_id(artist_ids):
+    """Discussion and distinct-listener counts per artist id (two queries for the whole page)."""
+    if not artist_ids:
+        return {}, {}
+    discussion_rows = (
+        db.session.query(Discussion.artist_id, func.count(Discussion.id))
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .group_by(Discussion.artist_id)
+        .all()
+    )
+    disc = {int(aid): int(c) for aid, c in discussion_rows}
+    listener_rows = (
+        db.session.query(
+            Discussion.artist_id,
+            func.count(func.distinct(Post.author_user_id)),
+        )
+        .join(Post, Post.discussion_id == Discussion.id)
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .filter(Post.is_deleted.is_(False))
+        .group_by(Discussion.artist_id)
+        .all()
+    )
+    lstn = {int(aid): int(c) for aid, c in listener_rows}
+    return disc, lstn
+
+
 @bp.route("/artists")
 def get_artists():
     """Return paginated artist list with optional active_discussions, genre, and sort filters."""
@@ -41,9 +67,22 @@ def get_artists():
 
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    items = paginated.items
+    ids = [a.id for a in items]
+    disc_map, listen_map = _artist_list_counts_by_id(ids)
+    artists_out = [
+        a.to_dict(
+            list_counts={
+                "discussion": disc_map.get(a.id, 0),
+                "listeners": listen_map.get(a.id, 0),
+            }
+        )
+        for a in items
+    ]
+
     return jsonify(
         {
-            "artists": [a.to_dict() for a in paginated.items],
+            "artists": artists_out,
             "total": paginated.total,
             "page": paginated.page,
             "pages": paginated.pages,
@@ -443,8 +482,18 @@ def search():
     pattern = f"%{q}%"
     artists = Artist.query.filter(Artist.name.ilike(pattern)).limit(5).all()
     albums = Album.query.filter(Album.title.ilike(pattern)).limit(5).all()
+    a_ids = [a.id for a in artists]
+    disc_map, listen_map = _artist_list_counts_by_id(a_ids)
 
     return jsonify({
-        "artists": [a.to_dict() for a in artists],
+        "artists": [
+            a.to_dict(
+                list_counts={
+                    "discussion": disc_map.get(a.id, 0),
+                    "listeners": listen_map.get(a.id, 0),
+                }
+            )
+            for a in artists
+        ],
         "albums": [a.to_dict() for a in albums],
     })

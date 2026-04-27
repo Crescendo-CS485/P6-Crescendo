@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify, session
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from .models import List, ListAlbum, ListLike, Album
 from . import db
 
@@ -116,13 +118,35 @@ def toggle_like(list_id):
 
     if existing:
         db.session.delete(existing)
-        like_count = max(0, lst.like_count - 1)
         liked = False
     else:
         db.session.add(ListLike(list_id=list_id, user_id=user_id))
-        like_count = lst.like_count + 1
         liked = True
 
+    try:
+        db.session.flush()
+    except IntegrityError:
+        # Concurrent duplicate like (same list_id + user_id): return reconciled state.
+        db.session.rollback()
+        lst = db.session.get(List, list_id)
+        if not lst:
+            return jsonify({"error": "List not found"}), 404
+        like_count = (
+            db.session.query(func.count(ListLike.id))
+            .filter_by(list_id=list_id)
+            .scalar()
+            or 0
+        )
+        lst.like_count = like_count
+        db.session.commit()
+        return jsonify({"liked": True, "likeCount": like_count})
+
+    like_count = (
+        db.session.query(func.count(ListLike.id))
+        .filter_by(list_id=list_id)
+        .scalar()
+        or 0
+    )
     lst.like_count = like_count
     db.session.commit()
     return jsonify({"liked": liked, "likeCount": like_count})

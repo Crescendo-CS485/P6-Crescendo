@@ -33,23 +33,30 @@ class Artist(db.Model):
         "Genre", secondary=artist_genres, backref="artists", lazy="joined"
     )
 
-    def to_dict(self):
-        discussion_count = (
-            db.session.query(func.count(Discussion.id))
-            .filter(Discussion.artist_id == self.id)
-            .scalar()
-            or 0
-        )
+    def to_dict(self, *, list_counts=None):
+        """list_counts: optional {"discussion": int, "listeners": int} from a batched
+        query (e.g. GET /api/artists) to avoid N+1 aggregate queries per artist."""
+        if list_counts is not None:
+            discussion_count = list_counts["discussion"]
+            listener_count = list_counts["listeners"]
+        else:
+            discussion_count = (
+                db.session.query(func.count(Discussion.id))
+                .filter(Discussion.artist_id == self.id)
+                .scalar()
+                or 0
+            )
+            listener_count = (
+                db.session.query(func.count(func.distinct(Post.author_user_id)))
+                .join(Discussion, Post.discussion_id == Discussion.id)
+                .filter(Discussion.artist_id == self.id)
+                .filter(Post.is_deleted.is_(False))
+                .scalar()
+                or 0
+            )
         latest_disc = (
             max(self.discussions, key=lambda d: d.last_activity_at)
             if self.discussions else None
-        )
-        listener_count = (
-            db.session.query(func.count(func.distinct(Post.author_user_id)))
-            .join(Discussion, Post.discussion_id == Discussion.id)
-            .filter(Discussion.artist_id == self.id)
-            .filter(Post.is_deleted.is_(False))
-            .scalar() or 0
         )
         return {
             "id": str(self.id),

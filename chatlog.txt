@@ -288,3 +288,11 @@ PROMPT:
 
 RESPONSE:
 Addressed the latest Copilot trio: `create_album` now rejects `releaseYear` outside 1–9999 before building `date()` (avoids 500s from `ValueError`), `Artist.to_dict()` uses a SQL `COUNT` for `discussionCount` instead of `len(self.discussions)` so counting does not load the full discussion collection, list like/fork tests assert `201` after `POST /api/lists`, and added `test_release_year_out_of_range_returns_400`.
+
+---
+
+PROMPT:
+3 new comments
+
+RESPONSE:
+Follow-up Copilot batch: `GET /api/artists` and `/api/search` now batch-load per-artist discussion and distinct-listener counts (two aggregate queries per response) and pass them into `Artist.to_dict(list_counts=…)` to remove N+1 count queries on list pages. `POST /api/lists/:id/like` catches concurrent `IntegrityError` on duplicate likes, rolls back, reconciles `like_count` from `COUNT(list_like)`, and returns the current liked state; successful toggles also persist `like_count` from the DB count to avoid lost updates.

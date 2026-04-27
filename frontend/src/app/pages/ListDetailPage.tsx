@@ -70,8 +70,6 @@ export default function ListDetailPage() {
     setRemoving(null);
     setViewMode("grid");
     setLiking(false);
-    setLocalLiked(false);
-    setLocalLikeCount(0);
   }, [id]);
 
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({

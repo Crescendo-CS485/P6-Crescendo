@@ -837,6 +837,10 @@ class TestSearch:
 class TestDebugJobs:
     """Spec tests 46-47"""
 
+    def test_jobs_requires_session(self, client):
+        r = client.get("/api/debug/jobs")
+        assert r.status_code == 403
+
     def test_returns_last_20(self, client, make_artist, make_user, make_discussion):
         a = make_artist(name="DebugArt")
         u = make_user(handle="@debug_user", is_bot=True)
@@ -850,6 +854,8 @@ class TestDebugJobs:
             )
             db.session.add(job)
         db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
         r = client.get("/api/debug/jobs")
         assert r.status_code == 200
         assert len(r.get_json()) == 20
@@ -866,6 +872,8 @@ class TestDebugJobs:
         )
         db.session.add(job)
         db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
         r = client.get("/api/debug/jobs")
         entry = r.get_json()[0]
         for key in ("id", "artist_id", "discussion_id", "status",
@@ -877,6 +885,10 @@ class TestDebugJobs:
 
 class TestDebugRunJob:
     """Spec tests 48-49"""
+
+    def test_run_job_requires_session(self, client):
+        r = client.post("/api/debug/run-job/1")
+        assert r.status_code == 403
 
     def test_sync_execution(self, client, make_artist, make_user, make_discussion, make_persona):
         a = make_artist(name="RunJobArt")
@@ -891,13 +903,19 @@ class TestDebugRunJob:
         db.session.add(job)
         db.session.commit()
 
+        with client.session_transaction() as sess:
+            sess["user_id"] = bot.id
         with patch("app.services.llm_service.LLMServiceAPI.generate_comment",
                     return_value="Mocked comment"):
             r = client.post(f"/api/debug/run-job/{job.id}")
         assert r.status_code == 200
         assert r.get_json()["status"] == "completed"
 
-    def test_nonexistent_job(self, client):
+    def test_nonexistent_job(self, client, make_user):
+        u = make_user(handle="@nj_debug", is_bot=False)
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
         r = client.post("/api/debug/run-job/9999")
         # _execute_job returns early for None job, then route tries job.status on None → 500
         assert r.status_code == 500

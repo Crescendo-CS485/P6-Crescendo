@@ -1,8 +1,15 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, session, abort
 
 from .models import LLMJob
 
 debug_bp = Blueprint("debug", __name__, url_prefix="/api/debug")
+
+
+@debug_bp.before_request
+def _require_session_for_debug():
+    """Debug routes are dev-only (see app factory) but still require a signed-in user."""
+    if not session.get("user_id"):
+        abort(403)
 
 
 @debug_bp.route("/jobs")

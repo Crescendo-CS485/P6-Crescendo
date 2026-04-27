@@ -3,7 +3,7 @@ import { API_BASE, apiFetch } from "../../lib/api";
 import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Artist, Album } from "../data/mockData";
@@ -19,22 +19,38 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ artists: Artist[]; albums: Album[] } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const latestSearchQueryRef = useRef(searchQuery);
+  latestSearchQueryRef.current = searchQuery;
 
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults(null);
       return;
     }
+    const ac = new AbortController();
+    const qAtFire = searchQuery;
     const t = setTimeout(() => {
-      apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
+      apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(qAtFire)}`, { signal: ac.signal })
         .then(async (r) => {
           if (!r.ok) throw new Error("Search failed");
           return r.json();
         })
-        .then(setSearchResults)
-        .catch(() => setSearchResults(null));
+        .then((data) => {
+          if (latestSearchQueryRef.current !== qAtFire) return;
+          setSearchResults(data);
+        })
+        .catch((err: unknown) => {
+          if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") {
+            return;
+          }
+          if (latestSearchQueryRef.current !== qAtFire) return;
+          setSearchResults(null);
+        });
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [searchQuery]);
 
   const navItems = [

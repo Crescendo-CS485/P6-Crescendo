@@ -138,7 +138,7 @@ def get_artists():
 @bp.route("/artists", methods=["POST"])
 def create_artist():
     if not current_app.config.get("ENABLE_CATALOG_WRITE"):
-        return jsonify({"error": "Catalog write is disabled"}), 404
+        return jsonify({"error": "Catalog write is disabled"}), 403
 
     if not session.get("user_id"):
         return jsonify({"error": "Authentication required"}), 401
@@ -368,7 +368,7 @@ def get_albums():
 @bp.route("/albums", methods=["POST"])
 def create_album():
     if not current_app.config.get("ENABLE_CATALOG_WRITE"):
-        return jsonify({"error": "Catalog write is disabled"}), 404
+        return jsonify({"error": "Catalog write is disabled"}), 403
 
     if not session.get("user_id"):
         return jsonify({"error": "Authentication required"}), 401

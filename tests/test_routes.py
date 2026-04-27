@@ -197,10 +197,10 @@ class TestCreateArtist:
         assert "Pop" in data["genres"]
         assert "Dream Pop" in data["genres"]
 
-    def test_disabled_returns_404(self, client, app):
+    def test_disabled_returns_403(self, client, app):
         app.config["ENABLE_CATALOG_WRITE"] = False
         r = client.post("/api/artists", json={"name": "Blocked Artist"})
-        assert r.status_code == 404
+        assert r.status_code == 403
 
     def test_requires_auth(self, client, app):
         app.config["ENABLE_CATALOG_WRITE"] = True
@@ -614,10 +614,10 @@ class TestCreateAlbum:
         assert data["releaseYear"] == 2026
         assert "Indie" in data["genres"]
 
-    def test_disabled_returns_404(self, client, app):
+    def test_disabled_returns_403(self, client, app):
         app.config["ENABLE_CATALOG_WRITE"] = False
         r = client.post("/api/albums", json={"title": "Blocked"})
-        assert r.status_code == 404
+        assert r.status_code == 403
 
     def test_requires_auth(self, client, app):
         app.config["ENABLE_CATALOG_WRITE"] = True

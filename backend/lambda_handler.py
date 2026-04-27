@@ -15,9 +15,9 @@ if __import__("os").environ.get("LAMBDA_CREATE_TABLES") == "1":
 
         with flask_app.app_context():
             db.create_all()
-    except Exception:
+    except Exception as e:
         # If the DB is unreachable during cold start, let requests fail with normal API errors.
         # This keeps the handler importable so Lambda can surface logs/health.
-        pass
+        print(f"[lambda_handler] LAMBDA_CREATE_TABLES failed: {e}")
 
 handler = Mangum(WSGIMiddleware(flask_app), lifespan="off")

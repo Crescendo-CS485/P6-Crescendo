@@ -256,3 +256,11 @@ https://github.com/Crescendo-CS485/P6-Crescendo/pull/10  can you baby sit this P
 
 RESPONSE:
 Triaged PR #10 review feedback and implemented remaining high-confidence fixes: catalog write flag checks now use parsed config booleans, profile and create-album query loaders now throw on non-OK responses so error UI can render, and grid/list icon toggle buttons now include accessible names. Verified no linter issues on edited files and prepared branch for push/re-run of CI.
+
+---
+
+PROMPT:
+4 new comments, please baby sit this.
+
+RESPONSE:
+Triaged the 4 new PR comments and applied fixes: `create_album` now validates `releaseYear` (returns 400 on invalid values), `listenerCount` excludes soft-deleted posts, and backend tests were expanded for `POST /api/artists` and `POST /api/albums` covering success plus key failure paths. Could not run pytest locally because `pytest` is not installed in the current environment; no linter issues in edited files.

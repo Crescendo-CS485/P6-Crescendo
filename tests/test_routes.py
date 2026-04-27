@@ -110,6 +110,19 @@ class TestGetArtists:
         assert data["artists"] == []
         assert data["total"] == 0
 
+    def test_listener_count_excludes_deleted_posts(self, client, make_artist, make_user, make_discussion, make_post):
+        artist = make_artist(name="ListenerCountArtist")
+        user = make_user(handle="@listener_visible")
+        discussion = make_discussion(artist.id, user.id, title="Listeners")
+        make_post(discussion.id, user.id, body="Visible", is_deleted=False)
+        make_post(discussion.id, user.id, body="Deleted", is_deleted=True)
+        db.session.commit()
+
+        r = client.get("/api/artists")
+        assert r.status_code == 200
+        payload = r.get_json()["artists"][0]
+        assert payload["listenerCount"] == 1
+
 
 # ── GET /api/artists/<id> ──────────────────────────────────────────────
 
@@ -140,6 +153,54 @@ class TestGetArtist:
         assert data["name"] == "Lonely Artist"
         assert data["latestThread"]["id"] == str(d.id)
         assert data["latestThread"]["title"] == "Thread Title"
+
+
+class TestCreateArtist:
+    def test_success_creates_artist_and_genres(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Creator",
+            "handle": "creator_artist",
+            "email": "creator_artist@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        r = client.post("/api/artists", json={
+            "name": "New Artist",
+            "bio": "A bio",
+            "genres": ["Pop", "Dream Pop"],
+        })
+        assert r.status_code == 201
+        data = r.get_json()["artist"]
+        assert data["name"] == "New Artist"
+        assert "Pop" in data["genres"]
+        assert "Dream Pop" in data["genres"]
+
+    def test_disabled_returns_404(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = False
+        r = client.post("/api/artists", json={"name": "Blocked Artist"})
+        assert r.status_code == 404
+
+    def test_requires_auth(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        r = client.post("/api/artists", json={"name": "NoAuth Artist"})
+        assert r.status_code == 401
+
+    def test_missing_or_blank_name_returns_400(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Name Checker",
+            "handle": "name_checker",
+            "email": "name_checker@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        missing = client.post("/api/artists", json={})
+        assert missing.status_code == 400
+        blank = client.post("/api/artists", json={"name": "   "})
+        assert blank.status_code == 400
 
 
 # ── GET /api/genres ─────────────────────────────────────────────────────
@@ -505,6 +566,86 @@ class TestGetAlbums:
         r = client.get("/api/albums?sort=user_score")
         data = r.get_json()
         assert data["albums"][0]["userScore"] == 9.5
+
+
+class TestCreateAlbum:
+    def test_success_creates_album(self, client, app, make_artist):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        artist = make_artist(name="Album Target")
+        db.session.commit()
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Album Creator",
+            "handle": "album_creator",
+            "email": "album_creator@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        r = client.post("/api/albums", json={
+            "title": "Created Album",
+            "artistId": str(artist.id),
+            "releaseYear": "2026",
+            "albumType": "studio",
+            "genres": ["Indie"],
+        })
+        assert r.status_code == 201
+        data = r.get_json()["album"]
+        assert data["title"] == "Created Album"
+        assert data["releaseYear"] == 2026
+        assert "Indie" in data["genres"]
+
+    def test_disabled_returns_404(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = False
+        r = client.post("/api/albums", json={"title": "Blocked"})
+        assert r.status_code == 404
+
+    def test_requires_auth(self, client, app):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        r = client.post("/api/albums", json={"title": "NoAuth"})
+        assert r.status_code == 401
+
+    def test_missing_fields_and_missing_artist(self, client, app, make_artist):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Album Validator",
+            "handle": "album_validator",
+            "email": "album_validator@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        missing_title = client.post("/api/albums", json={"artistId": "1"})
+        assert missing_title.status_code == 400
+        missing_artist = client.post("/api/albums", json={"title": "Needs Artist"})
+        assert missing_artist.status_code == 400
+
+        artist = make_artist(name="Exists")
+        db.session.commit()
+        not_found = client.post("/api/albums", json={
+            "title": "Missing Artist",
+            "artistId": str(artist.id + 999),
+        })
+        assert not_found.status_code == 404
+
+    def test_invalid_release_year_returns_400(self, client, app, make_artist):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        artist = make_artist(name="Year Artist")
+        db.session.commit()
+        reg = client.post("/api/auth/register", json={
+            "displayName": "Year Validator",
+            "handle": "year_validator",
+            "email": "year_validator@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        for bad_year in ("nope", 2026.7, True):
+            resp = client.post("/api/albums", json={
+                "title": "Bad Year",
+                "artistId": str(artist.id),
+                "releaseYear": bad_year,
+            })
+            assert resp.status_code == 400
 
 
 # ── GET /api/albums/genres ──────────────────────────────────────────────

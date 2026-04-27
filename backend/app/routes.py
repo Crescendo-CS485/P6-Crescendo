@@ -306,7 +306,17 @@ def create_album():
     if not artist:
         return jsonify({"error": "Artist not found"}), 404
 
-    year = int(release_year) if release_year else None
+    year = None
+    if release_year is not None and release_year != "":
+        if isinstance(release_year, bool):
+            return jsonify({"error": "releaseYear must be a valid integer"}), 400
+        try:
+            if isinstance(release_year, str):
+                year = int(release_year.strip())
+            else:
+                year = int(release_year)
+        except (TypeError, ValueError):
+            return jsonify({"error": "releaseYear must be a valid integer"}), 400
     release_date = date(year, 1, 1) if year else None
     album = Album(
         title=title,

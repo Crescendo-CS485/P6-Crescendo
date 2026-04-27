@@ -42,6 +42,7 @@ class Artist(db.Model):
             db.session.query(func.count(func.distinct(Post.author_user_id)))
             .join(Discussion, Post.discussion_id == Discussion.id)
             .filter(Discussion.artist_id == self.id)
+            .filter(Post.is_deleted.is_(False))
             .scalar() or 0
         )
         return {

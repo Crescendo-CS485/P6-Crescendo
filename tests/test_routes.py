@@ -958,6 +958,21 @@ class TestEdgeCases:
         lst = r2.get_json()["list"]
         assert "albums" in lst
         assert len(lst["albums"]) == 1
+        assert lst["userHasLiked"] is False
+        assert r1.get_json()["list"]["userHasLiked"] is False
+
+    def test_remove_album_response_includes_userHasLiked(self, client, make_artist, make_album):
+        self._register(client, "remuhl")
+        a = make_artist(name="RemArtist")
+        album = make_album(title="RemAlb", artist_id=a.id)
+        db.session.commit()
+        r = client.post("/api/lists", json={"title": "RemList"})
+        list_id = int(r.get_json()["list"]["id"])
+        assert r.get_json()["list"]["userHasLiked"] is False
+        client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
+        resp = client.delete(f"/api/lists/{list_id}/albums/{album.id}")
+        assert resp.status_code == 200
+        assert resp.get_json()["list"]["userHasLiked"] is False
 
     def test_remove_album_nonexistent_list(self, client):
         self._register(client, "remlist")
@@ -1119,6 +1134,7 @@ class TestListFork:
             sess["user_id"] = owner.id
         r = client.post("/api/lists", json={"title": "Original"})
         assert r.status_code == 201
+        assert r.get_json()["list"]["userHasLiked"] is False
         list_id = r.get_json()["list"]["id"]
         client.post(f"/api/lists/{list_id}/albums", json={"albumId": album.id})
 
@@ -1129,6 +1145,7 @@ class TestListFork:
         data = resp.get_json()["list"]
         assert data["title"] == "Original (copy)"
         assert data["creatorUserId"] == str(forker.id)
+        assert data["userHasLiked"] is False
 
     def test_fork_albums_are_copied(self, client, make_user, make_artist, make_album):
         owner = make_user(handle="@fork_album_owner")

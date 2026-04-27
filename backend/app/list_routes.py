@@ -68,7 +68,7 @@ def create_list():
     )
     db.session.add(lst)
     db.session.commit()
-    return jsonify({"list": lst.to_dict()}), 201
+    return jsonify({"list": _with_liked(lst.to_dict(), lst.id, creator_user_id)}), 201
 
 
 @list_bp.route("/<int:list_id>/albums", methods=["POST"])
@@ -99,7 +99,7 @@ def add_album(list_id):
         db.session.add(la)
         db.session.commit()
 
-    return jsonify({"list": lst.to_dict(include_albums=True)}), 200
+    return jsonify({"list": _with_liked(lst.to_dict(include_albums=True), list_id, uid)}), 200
 
 
 @list_bp.route("/<int:list_id>/like", methods=["POST"])
@@ -175,7 +175,7 @@ def fork_list(list_id):
         db.session.add(ListAlbum(list_id=fork.id, album_id=la.album_id))
 
     db.session.commit()
-    return jsonify({"list": fork.to_dict()}), 201
+    return jsonify({"list": _with_liked(fork.to_dict(), fork.id, user_id)}), 201
 
 
 @list_bp.route("/<int:list_id>/albums/<int:album_id>", methods=["DELETE"])
@@ -196,4 +196,4 @@ def remove_album(list_id, album_id):
         db.session.delete(la)
         db.session.commit()
 
-    return jsonify({"list": lst.to_dict(include_albums=True)}), 200
+    return jsonify({"list": _with_liked(lst.to_dict(include_albums=True), list_id, uid)}), 200

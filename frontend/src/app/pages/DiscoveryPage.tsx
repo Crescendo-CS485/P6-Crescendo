@@ -209,19 +209,24 @@ export default function DiscoveryPage() {
 
       {/* Loading */}
       {effectiveLoading && (
-        viewMode === "grid" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {Array.from({ length: PER_PAGE }).map((_, i) => (
-              <ArtistCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {Array.from({ length: PER_PAGE }).map((_, i) => (
-              <div key={i} className="h-16 bg-[#252525] border border-[#333333] animate-pulse" />
-            ))}
-          </div>
-        )
+        <>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            Loading artists
+          </p>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <ArtistCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <div key={i} className="h-16 bg-[#252525] border border-[#333333] animate-pulse" />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Empty */}

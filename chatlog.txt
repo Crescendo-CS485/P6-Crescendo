@@ -304,3 +304,11 @@ PROMPT:
 
 RESPONSE:
 Addressed latest Copilot trio: batched latest-thread payloads for `GET /api/artists` and `/api/search` (with `list_counts["latestThread"]`) so list serialization no longer lazy-loads `artist.discussions` for `max(last_activity_at)`; `AuthProvider` no longer clears the user on fetch/network failures, sets `authError` on non-401/`!ok`/catch, exposes `retryAuthCheck`, and `ProfilePage` shows an error state with retry when session check fails while unauthenticated-looking; `CreateAlbumModal` validates release year digits and 1–9999 before submit so non-numeric input cannot become JSON `null` via `NaN`.
+
+---
+
+PROMPT:
+5 NEW COMMENTS
+
+RESPONSE:
+Aligned list API payloads: `POST /api/lists`, `POST/DELETE …/albums`, and `POST …/fork` now wrap responses with `_with_liked` so `userHasLiked` matches `GET /api/lists/:id`. Discovery loading state includes a visually hidden `role="status"` / `aria-live="polite"` message. Added route tests asserting `userHasLiked` on create/add/remove/fork paths.

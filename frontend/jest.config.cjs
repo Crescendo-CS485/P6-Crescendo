@@ -24,5 +24,6 @@ module.exports = {
   collectCoverageFrom: [
     "<rootDir>/src/app/pages/DiscoveryPage.tsx",
     "<rootDir>/src/app/pages/ArtistPage.tsx",
+    "<rootDir>/src/app/pages/ListDetailPage.tsx",
   ],
 };

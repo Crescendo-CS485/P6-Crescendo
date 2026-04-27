@@ -34,3 +34,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Session assistant log (local only; not shipped)
+chatlog.txt

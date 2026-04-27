@@ -159,7 +159,7 @@ export default function ArtistPage() {
           <div className="mb-8">
             <Button
               onClick={handleTrigger}
-              disabled={triggering || !user}
+              disabled={triggering}
               className="bg-[#ff6b35] hover:bg-[#e55a2b] text-white font-semibold rounded-sm h-9 px-4 text-sm flex items-center gap-2 disabled:opacity-60"
             >
               {triggering ? (

@@ -59,8 +59,10 @@ export default function ListDetailPage() {
   const [liking, setLiking] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
+  const listQueryUser = user?.id ?? "anon";
+
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
-    queryKey: ["list", id],
+    queryKey: ["list", id, listQueryUser],
     queryFn: () =>
       apiFetch(`${API_BASE}/api/lists/${id}`).then((r) => {
         if (!r.ok) throw new Error("List not found");

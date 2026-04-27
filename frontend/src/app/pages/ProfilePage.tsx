@@ -28,7 +28,7 @@ export default function ProfilePage() {
     isError: listsError,
     refetch: refetchLists,
   } = useQuery<ListsResponse>({
-    queryKey: ["lists"],
+    queryKey: ["lists", user?.id ?? "__none__"],
     queryFn: () =>
       apiFetch(`${API_BASE}/api/lists`).then((r) => {
         if (!r.ok) throw new Error("Failed to load lists");

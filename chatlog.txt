@@ -320,3 +320,11 @@ PROMPT:
 
 RESPONSE:
 Profile modals no longer call `refetchLists()` on artist/album create; `useQueryClient` invalidates `artists` / `artists-lite` vs album-related query keys instead. Moved the lists `useQuery` above auth early returns with `enabled: Boolean(user)` so hooks stay ordered. `GET /api/artists?sort=recent` now orders via an outer join to a grouped discussion-count subquery plus stable `Artist.id` tie-break instead of a correlated scalar subquery. `Artist.to_dict()` (non-list path) loads the latest discussion with one ordered query instead of `max(self.discussions, ...)`.
+
+---
+
+PROMPT:
+5 new comments
+
+RESPONSE:
+React Query keys for session-dependent list data now include the current user id (`ListsPage`, `ProfilePage` lists, `ListDetailPage` detail). `GET /api/albums/genres` uses `joinedload(Genre.albums).joinedload(Album.artist)` to avoid N+1 when resolving cover fallbacks to artist images. `ArtistPage` trigger button stays enabled when signed out so the toast path runs; only `triggering` disables the control.

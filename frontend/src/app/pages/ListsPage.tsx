@@ -85,8 +85,10 @@ export default function ListsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
+  const listsQueryUser = user?.id ?? "anon";
+
   const { data, isLoading, isError } = useQuery<ListsResponse>({
-    queryKey: ["lists"],
+    queryKey: ["lists", listsQueryUser],
     queryFn: () =>
       apiFetch(`${API_BASE}/api/lists`).then((r) => {
         if (!r.ok) throw new Error("Failed to load lists");

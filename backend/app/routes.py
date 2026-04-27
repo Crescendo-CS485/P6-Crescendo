@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, session, current_app
 from sqlalchemy import nullslast, func
+from sqlalchemy.orm import joinedload
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
 from . import db
 
@@ -456,7 +457,11 @@ def create_album():
 
 @bp.route("/albums/genres")
 def get_album_genres():
-    genres = Genre.query.order_by(Genre.name).all()
+    genres = (
+        Genre.query.options(joinedload(Genre.albums).joinedload(Album.artist))
+        .order_by(Genre.name)
+        .all()
+    )
     result = []
     for genre in genres:
         albums = genre.albums

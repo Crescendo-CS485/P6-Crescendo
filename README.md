@@ -78,17 +78,16 @@ npm test        # runs pytest with coverage
 
 **What you should see:**
 
-- 86 tests passing
-- `models.py` at 100% coverage
-- `routes.py` at 96% coverage
+- All tests passing
+- `models.py` and `routes.py` at high coverage (exact percentages may drift as the project evolves)
 
 **Test file locations:**
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/conftest.py` | — | Shared fixtures: in-memory SQLite DB, mock APScheduler, factory helpers, auto-cleanup |
-| `tests/test_models.py` | 25 | All `to_dict()` methods on Artist, User, Discussion, Post, Album, and List models |
-| `tests/test_routes.py` | 59 | All 14 route handlers in `routes.py` — filtering, pagination, error handling, bot flair, dedup, search |
+| `tests/test_models.py` | (varies) | All `to_dict()` methods on Artist, User, Discussion, Post, Album, and List models |
+| `tests/test_routes.py` | (varies) | Route handlers in `routes.py` — filtering, pagination, error handling, bot flair, dedup, search |
 
 Note: legacy test files previously located under `backend/testing/` and `backend/tests/` have been removed; the canonical test suite now lives in the top-level `tests/` directory. Run the full backend test suite from the project root with:
 

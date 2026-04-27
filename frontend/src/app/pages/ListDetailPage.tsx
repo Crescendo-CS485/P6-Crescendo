@@ -116,10 +116,19 @@ export default function ListDetailPage() {
         setLocalLiked(result.liked);
         setLocalLikeCount(result.likeCount);
       } else {
+        let message = `Could not update like (${res.status})`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          /* non-JSON error body */
+        }
+        toast.error(message);
         setLocalLiked(prevLiked);
         setLocalLikeCount(prevCount);
       }
     } catch {
+      toast.error("Network error — could not reach the server");
       setLocalLiked(prevLiked);
       setLocalLikeCount(prevCount);
     } finally {
@@ -162,6 +171,15 @@ export default function ListDetailPage() {
       const res = await apiFetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["list", id, listQueryUser] });
+      } else {
+        let message = `Could not remove album (${res.status})`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          /* non-JSON error body */
+        }
+        toast.error(message);
       }
     } finally {
       setRemoving(null);

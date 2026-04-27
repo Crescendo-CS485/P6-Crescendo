@@ -58,13 +58,17 @@ class Artist(db.Model):
             latest_disc = (
                 db.session.query(Discussion)
                 .filter(Discussion.artist_id == self.id)
-                .order_by(desc(Discussion.last_activity_at), desc(Discussion.id))
+                .order_by(desc(Discussion.last_activity_at).nullslast(), desc(Discussion.id))
                 .first()
             )
             latest_thread = {
                 "id": str(latest_disc.id) if latest_disc else None,
                 "title": latest_disc.title if latest_disc else None,
-                "timestamp": latest_disc.last_activity_at.isoformat() if latest_disc else None,
+                "timestamp": (
+                    latest_disc.last_activity_at.isoformat()
+                    if latest_disc and latest_disc.last_activity_at
+                    else None
+                ),
             }
         return {
             "id": str(self.id),

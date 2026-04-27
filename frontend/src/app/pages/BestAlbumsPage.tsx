@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, LayoutGrid, List, Star, MessageSquare } from "lucide-react";
+import { BarChart3, LayoutGrid, List, Star, MessageSquare, Music } from "lucide-react";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCard } from "../components/AlbumCard";

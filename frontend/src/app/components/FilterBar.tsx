@@ -137,7 +137,7 @@ export function FilterBar({
                 </div>
                 {activeDiscussions && (
                   <div className="text-[10px] text-[#5b9dd9] font-mono">
-                    GET /artists?active_discussions=true
+                    GET /api/artists?active_discussions=true
                   </div>
                 )}
               </div>

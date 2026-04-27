@@ -67,7 +67,7 @@ export function FilterBar({
   const activeFilterCount =
     ((activeDiscussions ?? false) ? 1 : 0) +
     (selectedGenres?.length ?? 0) +
-    (onTimeRangeChange && safeSelectedTimeRange !== defaultTimeRange ? 1 : 0);
+    (onTimeRangeChange && safeSelectedTimeRange !== fallbackTimeRange ? 1 : 0);
 
   return (
     <div className="bg-[#252525] border border-[#333333] mb-6">

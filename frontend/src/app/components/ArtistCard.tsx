@@ -11,7 +11,6 @@ interface ArtistCardProps {
 export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
   const navigate = useNavigate();
   const isHighActivity = artist.activityScore >= 8.5;
-  const imageSrc = artist.image || "";
 
   return (
     <Link
@@ -20,11 +19,15 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
     >
       {/* Artist Image - Square */}
       <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-        <img
-          src={imageSrc}
-          alt={artist.name}
-          className="w-full h-full object-cover"
-        />
+        {artist.image ? (
+          <img
+            src={artist.image}
+            alt={artist.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-[#1a1a1a]" aria-hidden="true" />
+        )}
         {/* Activity Score Badge */}
         <div
           className={`absolute top-2 right-2 px-2 py-1 text-center font-bold text-sm ${

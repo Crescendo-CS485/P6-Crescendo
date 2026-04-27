@@ -113,7 +113,11 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.image ?? ""} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            {a.image ? (
+                              <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                            )}
                             <span className="text-sm text-white">{a.name}</span>
                           </Link>
                         ))}
@@ -129,11 +133,15 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img
-                              src={a.coverUrl || a.artistImage || ""}
-                              alt={a.title}
-                              className="w-8 h-8 object-cover flex-shrink-0"
-                            />
+                            {a.coverUrl || a.artistImage ? (
+                              <img
+                                src={a.coverUrl || a.artistImage || undefined}
+                                alt={a.title}
+                                className="w-8 h-8 object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                            )}
                             <div>
                               <p className="text-sm text-white">{a.title}</p>
                               <p className="text-xs text-[#999999]">{a.artistName}</p>

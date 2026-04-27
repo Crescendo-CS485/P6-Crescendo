@@ -132,11 +132,18 @@ export function AddAlbumModal({
                 className="flex items-center gap-3 p-2.5 rounded-sm hover:bg-[#252525] transition-colors"
               >
                 {/* Cover */}
-                <img
-                  src={album.coverUrl || album.artistImage || ""}
-                  alt={album.title}
-                  className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
-                />
+                {album.coverUrl || album.artistImage ? (
+                  <img
+                    src={album.coverUrl || album.artistImage || undefined}
+                    alt={album.title}
+                    className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 bg-[#1a1a1a] border border-[#333333] flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">

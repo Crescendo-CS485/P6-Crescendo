@@ -336,3 +336,11 @@ PROMPT:
 
 RESPONSE:
 Updated frontend API hardening and contracts: search in `Layout` now checks `r.ok` before parsing JSON and clears results on failure; `AddAlbumModal` albums query throws on non-OK responses; `mockData` interfaces now allow nullable `Artist.image`/`bio` and nullable `Album.coverUrl`/`artistImage`/`releaseDate`/`releaseYear` to match backend responses. Added fallback rendering for nullable images/bio in `ArtistCard`, `ArtistPage`, search dropdown, and album picker image srcs. Adjusted `DiscoveryPage` loading test to assert a positive loading indicator and updated integration spec trigger-row text to reflect signed-out click+toast behavior.
+
+---
+
+PROMPT:
+7 new comments
+
+RESPONSE:
+Addressed the newest frontend review set: removed empty-string image `src` fallbacks by rendering placeholders in `ArtistCard`, `ArtistPage` hero, `Layout` search dropdown rows, and `AddAlbumModal` covers; updated list detail invalidation to the full session-scoped key (`["list", id, listQueryUser]`); and fixed profile avatar initial fallback so empty display names resolve to `"U"`.

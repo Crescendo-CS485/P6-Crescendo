@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, Zap, Loader2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Zap, Loader2, Music } from "lucide-react";
 import { toast } from "sonner";
 import { Artist, Discussion } from "../data/mockData";
 import { Button } from "../components/ui/button";
@@ -121,7 +121,13 @@ export default function ArtistPage() {
           {/* Hero */}
           <div className="flex gap-6 mb-8">
             <div className="w-40 h-40 flex-shrink-0 overflow-hidden border border-[#333333]">
-              <img src={artist.image || ""} alt={artist.name} className="w-full h-full object-cover" />
+              {artist.image ? (
+                <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center" aria-hidden="true">
+                  <Music className="w-10 h-10 text-[#444444]" />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap gap-1 mb-2">

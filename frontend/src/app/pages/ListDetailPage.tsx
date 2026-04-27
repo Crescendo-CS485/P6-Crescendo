@@ -124,7 +124,7 @@ export default function ListDetailPage() {
     try {
       const res = await apiFetch(`${API_BASE}/api/lists/${id}/albums/${albumId}`, { method: "DELETE" });
       if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ["list", id] });
+        queryClient.invalidateQueries({ queryKey: ["list", id, listQueryUser] });
       }
     } finally {
       setRemoving(null);

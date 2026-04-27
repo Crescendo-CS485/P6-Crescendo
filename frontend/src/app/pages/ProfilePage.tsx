@@ -77,7 +77,7 @@ export default function ProfilePage() {
     );
   }
 
-  const initial = user.displayName?.charAt(0)?.toUpperCase() ?? "U";
+  const initial = user.displayName?.trim().charAt(0).toUpperCase() || "U";
 
   const allLists = listsData?.lists ?? [];
   const yourLists = allLists.filter((l) => l.creatorUserId === user.id);

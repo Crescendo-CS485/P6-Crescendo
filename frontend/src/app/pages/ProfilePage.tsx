@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { User, Mail, AtSign, LogOut, ListMusic, Heart, Plus } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
@@ -18,8 +18,38 @@ interface ListsResponse {
 export default function ProfilePage() {
   const { user, isLoading, authError, retryAuthCheck, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [addArtistOpen, setAddArtistOpen] = useState(false);
   const [addAlbumOpen, setAddAlbumOpen] = useState(false);
+
+  const {
+    data: listsData,
+    isLoading: listsLoading,
+    isError: listsError,
+    refetch: refetchLists,
+  } = useQuery<ListsResponse>({
+    queryKey: ["lists"],
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/lists`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load lists");
+        return r.json();
+      }),
+    enabled: Boolean(user),
+    staleTime: 30_000,
+  });
+
+  const onArtistCreated = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["artists"] });
+    void queryClient.invalidateQueries({ queryKey: ["artists-lite"] });
+  }, [queryClient]);
+
+  const onAlbumCreated = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["albums"] });
+    void queryClient.invalidateQueries({ queryKey: ["albums-releases"] });
+    void queryClient.invalidateQueries({ queryKey: ["albums-by-genre"] });
+    void queryClient.invalidateQueries({ queryKey: ["album-genres"] });
+    void queryClient.invalidateQueries({ queryKey: ["albums-picker"] });
+  }, [queryClient]);
 
   if (isLoading) {
     return <LoadingState message="Loading your profile..." />;
@@ -48,21 +78,6 @@ export default function ProfilePage() {
   }
 
   const initial = user.displayName?.charAt(0)?.toUpperCase() ?? "U";
-
-  const {
-    data: listsData,
-    isLoading: listsLoading,
-    isError: listsError,
-    refetch: refetchLists,
-  } = useQuery<ListsResponse>({
-    queryKey: ["lists"],
-    queryFn: () =>
-      apiFetch(`${API_BASE}/api/lists`).then((r) => {
-        if (!r.ok) throw new Error("Failed to load lists");
-        return r.json();
-      }),
-    staleTime: 30_000,
-  });
 
   const allLists = listsData?.lists ?? [];
   const yourLists = allLists.filter((l) => l.creatorUserId === user.id);
@@ -209,12 +224,12 @@ export default function ProfilePage() {
       <AddArtistModal
         isOpen={addArtistOpen}
         onClose={() => setAddArtistOpen(false)}
-        onCreated={() => refetchLists()}
+        onCreated={onArtistCreated}
       />
       <CreateAlbumModal
         isOpen={addAlbumOpen}
         onClose={() => setAddAlbumOpen(false)}
-        onCreated={() => refetchLists()}
+        onCreated={onAlbumCreated}
       />
     </div>
   );

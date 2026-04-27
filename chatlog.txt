@@ -312,3 +312,11 @@ PROMPT:
 
 RESPONSE:
 Aligned list API payloads: `POST /api/lists`, `POST/DELETE …/albums`, and `POST …/fork` now wrap responses with `_with_liked` so `userHasLiked` matches `GET /api/lists/:id`. Discovery loading state includes a visually hidden `role="status"` / `aria-live="polite"` message. Added route tests asserting `userHasLiked` on create/add/remove/fork paths.
+
+---
+
+PROMPT:
+3 new comments
+
+RESPONSE:
+Profile modals no longer call `refetchLists()` on artist/album create; `useQueryClient` invalidates `artists` / `artists-lite` vs album-related query keys instead. Moved the lists `useQuery` above auth early returns with `enabled: Boolean(user)` so hooks stay ordered. `GET /api/artists?sort=recent` now orders via an outer join to a grouped discussion-count subquery plus stable `Artist.id` tie-break instead of a correlated scalar subquery. `Artist.to_dict()` (non-list path) loads the latest discussion with one ordered query instead of `max(self.discussions, ...)`.

@@ -87,12 +87,20 @@ def get_artists():
     sort = request.args.get("sort", "activity")
     if sort == "recent":
         disc_count_subq = (
-            db.session.query(func.count(Discussion.id))
-            .filter(Discussion.artist_id == Artist.id)
-            .correlate(Artist)
-            .scalar_subquery()
+            db.session.query(
+                Discussion.artist_id.label("artist_id"),
+                func.count(Discussion.id).label("discussion_count"),
+            )
+            .group_by(Discussion.artist_id)
+            .subquery()
         )
-        query = query.order_by(disc_count_subq.desc())
+        query = (
+            query.outerjoin(disc_count_subq, disc_count_subq.c.artist_id == Artist.id)
+            .order_by(
+                func.coalesce(disc_count_subq.c.discussion_count, 0).desc(),
+                Artist.id.asc(),
+            )
+        )
     else:
         query = query.order_by(Artist.activity_score.desc())
 

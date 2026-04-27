@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from . import db
 
 artist_genres = db.Table(
@@ -56,8 +56,10 @@ class Artist(db.Model):
                 or 0
             )
             latest_disc = (
-                max(self.discussions, key=lambda d: d.last_activity_at)
-                if self.discussions else None
+                db.session.query(Discussion)
+                .filter(Discussion.artist_id == self.id)
+                .order_by(desc(Discussion.last_activity_at), desc(Discussion.id))
+                .first()
             )
             latest_thread = {
                 "id": str(latest_disc.id) if latest_disc else None,

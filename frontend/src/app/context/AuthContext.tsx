@@ -86,9 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await apiFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
-    setAuthError(false);
-    setUser(null);
+    try {
+      await apiFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
+    } catch {
+      // Even if server-side logout fails (offline/CORS/server down), clear local auth state
+      // so the UI doesn’t get stuck in a "signed-in" state.
+    } finally {
+      setAuthError(false);
+      setUser(null);
+    }
   }
 
   return (

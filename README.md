@@ -839,7 +839,7 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
 
 > If you add `seed()` to Lambda startup later, allow extra time the first time the database is empty.
 5. Under **Configuration → Function URL**, click **Create function URL**, auth type **NONE**. Copy the URL — this is your API base URL.
-6. Update the frontend's `VITE_API_BASE_URL` (or the Vite proxy target) to point at your function URL.
+6. Update the frontend's `VITE_API_BASE` (or the Vite proxy target) to point at your function URL.
 
 > If you rename the function from `crescendo-api`, open `.github/workflows/deploy-aws-lambda.yml` and update the two `--function-name crescendo-api` references to match.
 

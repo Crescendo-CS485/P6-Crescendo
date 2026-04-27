@@ -108,7 +108,7 @@ export default function ListDetailPage() {
     const prevCount = effectiveLikeCount;
     const optimisticLiked = !effectiveLiked;
     setLocalLiked(optimisticLiked);
-    setLocalLikeCount((c) => optimisticLiked ? c + 1 : Math.max(0, c - 1));
+    setLocalLikeCount(() => optimisticLiked ? prevCount + 1 : Math.max(0, prevCount - 1));
     try {
       const res = await apiFetch(`${API_BASE}/api/lists/${id}/like`, { method: "POST" });
       if (res.ok) {
@@ -251,7 +251,7 @@ export default function ListDetailPage() {
                   aria-pressed={effectiveLiked}
                   aria-label={
                     effectiveLiked
-                      ? `Unlike this list, ${localLikeCount} likes`
+                      ? `Unlike this list, ${effectiveLikeCount} likes`
                       : `Like this list, ${effectiveLikeCount} likes`
                   }
                   className={`flex items-center gap-1.5 transition-colors ${effectiveLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"}`}

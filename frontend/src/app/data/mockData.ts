@@ -114,6 +114,7 @@ export const genres = [
   "Hip Hop",
   "Jazz",
   "Electronic",
+  "R&B",
   "Pop",
   "Country",
   "Indie",

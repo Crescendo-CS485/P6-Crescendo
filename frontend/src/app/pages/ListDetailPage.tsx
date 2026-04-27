@@ -56,8 +56,8 @@ export default function ListDetailPage() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [showForkBanner, setShowForkBanner] = useState(false);
   const [forking, setForking] = useState(false);
-  const [localLiked, setLocalLiked] = useState(false);
-  const [localLikeCount, setLocalLikeCount] = useState(0);
+  const [localLiked, setLocalLiked] = useState<boolean | null>(null);
+  const [localLikeCount, setLocalLikeCount] = useState<number | null>(null);
   const [liking, setLiking] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -70,8 +70,8 @@ export default function ListDetailPage() {
     setRemoving(null);
     setViewMode("grid");
     setLiking(false);
-    setLocalLiked(false);
-    setLocalLikeCount(0);
+    setLocalLiked(null);
+    setLocalLikeCount(null);
   }, [id]);
 
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
@@ -94,6 +94,9 @@ export default function ListDetailPage() {
     }
   }, [list]);
 
+  const effectiveLiked = localLiked ?? list?.userHasLiked ?? false;
+  const effectiveLikeCount = localLikeCount ?? list?.likes ?? 0;
+
   async function handleLike() {
     if (!user) return;
     if (!id) {
@@ -101,9 +104,9 @@ export default function ListDetailPage() {
       return;
     }
     setLiking(true);
-    const prevLiked = localLiked;
-    const prevCount = localLikeCount;
-    const optimisticLiked = !localLiked;
+    const prevLiked = effectiveLiked;
+    const prevCount = effectiveLikeCount;
+    const optimisticLiked = !effectiveLiked;
     setLocalLiked(optimisticLiked);
     setLocalLikeCount((c) => optimisticLiked ? c + 1 : Math.max(0, c - 1));
     try {
@@ -125,6 +128,10 @@ export default function ListDetailPage() {
   }
 
   async function handleFork() {
+    if (!id) {
+      toast.error("Missing list id");
+      return;
+    }
     setForking(true);
     try {
       const res = await apiFetch(`${API_BASE}/api/lists/${id}/fork`, { method: "POST" });
@@ -241,22 +248,22 @@ export default function ListDetailPage() {
                   type="button"
                   onClick={handleLike}
                   disabled={liking}
-                  aria-pressed={localLiked}
+                  aria-pressed={effectiveLiked}
                   aria-label={
-                    localLiked
+                    effectiveLiked
                       ? `Unlike this list, ${localLikeCount} likes`
-                      : `Like this list, ${localLikeCount} likes`
+                      : `Like this list, ${effectiveLikeCount} likes`
                   }
-                  className={`flex items-center gap-1.5 transition-colors ${localLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"}`}
-                  title={localLiked ? "Unlike" : "Like"}
+                  className={`flex items-center gap-1.5 transition-colors ${effectiveLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"}`}
+                  title={effectiveLiked ? "Unlike" : "Like"}
                 >
-                  <Heart className={`w-4 h-4 ${localLiked ? "fill-current" : ""}`} aria-hidden="true" />
-                  <span aria-hidden="true">{localLikeCount}</span>
+                  <Heart className={`w-4 h-4 ${effectiveLiked ? "fill-current" : ""}`} aria-hidden="true" />
+                  <span aria-hidden="true">{effectiveLikeCount}</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5 text-[#666666]">
                   <Heart className="w-4 h-4" />
-                  <span>{localLikeCount}</span>
+                  <span>{effectiveLikeCount}</span>
                 </div>
               )}
             </div>

@@ -1,8 +1,7 @@
 from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, session, current_app
 from sqlalchemy import nullslast, func
-from sqlalchemy.orm import joinedload
-from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
+from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User, album_genres
 from . import db
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -457,30 +456,61 @@ def create_album():
 
 @bp.route("/albums/genres")
 def get_album_genres():
-    genres = (
-        Genre.query.options(joinedload(Genre.albums).joinedload(Album.artist))
+    stats_rows = (
+        db.session.query(
+            Genre.id.label("genre_id"),
+            Genre.name.label("genre_name"),
+            func.count(Album.id).label("album_count"),
+            func.avg(Album.user_score).label("avg_score"),
+        )
+        .outerjoin(album_genres, album_genres.c.genre_id == Genre.id)
+        .outerjoin(Album, Album.id == album_genres.c.album_id)
+        .group_by(Genre.id, Genre.name)
         .order_by(Genre.name)
         .all()
     )
+
+    cover_ranked = (
+        db.session.query(
+            album_genres.c.genre_id.label("genre_id"),
+            func.coalesce(Album.cover_url, Artist.image_url).label("cover_url"),
+            func.row_number()
+            .over(
+                partition_by=album_genres.c.genre_id,
+                order_by=(nullslast(Album.user_score.desc()), Album.id.asc()),
+            )
+            .label("rn"),
+        )
+        .select_from(album_genres)
+        .join(Album, Album.id == album_genres.c.album_id)
+        .outerjoin(Artist, Artist.id == Album.artist_id)
+        .filter(func.coalesce(Album.cover_url, Artist.image_url).isnot(None))
+        .subquery()
+    )
+
+    cover_rows = (
+        db.session.query(cover_ranked.c.genre_id, cover_ranked.c.cover_url)
+        .filter(cover_ranked.c.rn <= 4)
+        .order_by(cover_ranked.c.genre_id.asc(), cover_ranked.c.rn.asc())
+        .all()
+    )
+    cover_map = {}
+    for genre_id, cover_url in cover_rows:
+        cover_map.setdefault(int(genre_id), []).append(cover_url)
+
     result = []
-    for genre in genres:
-        albums = genre.albums
-        if not albums:
+    for row in stats_rows:
+        count = int(row.album_count or 0)
+        if count == 0:
             continue
-        count = len(albums)
-        scores = [a.user_score for a in albums if a.user_score is not None]
-        avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
-        cover_images = [
-            (a.cover_url or (a.artist.image_url if a.artist else None))
-            for a in albums[:4]
-            if (a.cover_url or (a.artist.image_url if a.artist else None))
-        ]
+        avg_score = round(float(row.avg_score), 1) if row.avg_score is not None else 0.0
         result.append({
-            "name": genre.name,
+            "name": row.genre_name,
             "albumCount": count,
             "avgScore": avg_score,
-            "coverImages": cover_images,
+            "coverImages": cover_map.get(int(row.genre_id), []),
         })
+
     result.sort(key=lambda x: x["albumCount"], reverse=True)
     return jsonify({"genres": result})
 

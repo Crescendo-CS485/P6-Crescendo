@@ -88,7 +88,15 @@ export default function CommunityPage() {
 
   const { data: stats } = useQuery<{ artistCount: number; userCount: number }>({
     queryKey: ["stats"],
-    queryFn: () => apiFetch(`${API_BASE}/api/stats`).then((r) => r.json()),
+    queryFn: async () => {
+      try {
+        const r = await apiFetch(`${API_BASE}/api/stats`);
+        if (!r.ok) return { artistCount: 0, userCount: 0 };
+        return r.json();
+      } catch {
+        return { artistCount: 0, userCount: 0 };
+      }
+    },
     staleTime: 60_000,
   });
 

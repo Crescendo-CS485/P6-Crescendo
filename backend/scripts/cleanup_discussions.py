@@ -2,7 +2,8 @@
 One-off local utility to make seeded community discussions feel coherent.
 
 It updates the *existing* seeded discussions (instead of deleting) so URLs/IDs
-remain stable. Intended for local/dev databases only.
+remain stable. Intended for local/dev databases only. This script is a manual
+one-off utility and is not imported or executed by runtime application paths.
 """
 
 from __future__ import annotations

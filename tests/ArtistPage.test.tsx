@@ -3,6 +3,28 @@ import { render, screen, waitFor, act, fireEvent } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { toast } from "sonner";
+
+jest.mock("../frontend/src/app/context/AuthContext", () => {
+  const actual = jest.requireActual("../frontend/src/app/context/AuthContext");
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: {
+        id: "1",
+        displayName: "Test User",
+        handle: "@tester",
+        email: "test@example.com",
+        isBot: false,
+        botLabel: null,
+      },
+      isLoading: false,
+      register: jest.fn(),
+      login: jest.fn(),
+      logout: jest.fn(),
+    }),
+  };
+});
+
 import ArtistPage, { formatTime } from "../frontend/src/app/pages/ArtistPage";
 
 jest.mock("sonner", () => ({
@@ -253,59 +275,6 @@ describe("ArtistPage", () => {
     });
   });
 
-  // 40
-  test('developer control "Loading State" forces loading UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Loading State" }));
-
-    expect(screen.getByText("Loading artist...")).toBeInTheDocument();
-    expect(screen.queryByText(artist.name)).not.toBeInTheDocument();
-  });
-
-  // 41
-  test('developer control "Not Found State" forces not-found UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Not Found State" }));
-
-    expect(screen.getByText("Artist not found.")).toBeInTheDocument();
-    expect(screen.queryByText(artist.name)).not.toBeInTheDocument();
-  });
-
-  // 42
-  test('developer control "Live" restores actual query-driven UI', async () => {
-    const artist = makeArtist();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist }) });
-    });
-    renderPage("1");
-    await waitFor(() => screen.getByText(artist.name));
-
-    fireEvent.click(screen.getByRole("button", { name: "Loading State" }));
-    expect(screen.getByText("Loading artist...")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Live" }));
-
-    expect(screen.queryByText("Loading artist...")).not.toBeInTheDocument();
-    expect(screen.getByText(artist.name)).toBeInTheDocument();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -350,7 +319,10 @@ describe("Inline queryFn (artist)", () => {
     });
     renderPage("art-42");
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/artists/art-42");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/artists/art-42",
+        expect.objectContaining({ credentials: "include" }),
+      );
     });
   });
 
@@ -421,7 +393,10 @@ describe("Inline queryFn (discussions)", () => {
     });
     renderPage("art-42");
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/artists/art-42/discussions");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/artists/art-42/discussions",
+        expect.objectContaining({ credentials: "include" }),
+      );
     });
   });
 
@@ -532,11 +507,15 @@ describe("handleTrigger", () => {
     });
     await loadAndClickTrigger();
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: "page_activation", artistId: "1" }),
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/events",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventType: "page_activation", artistId: "1" }),
+          credentials: "include",
+        }),
+      );
     });
   });
 

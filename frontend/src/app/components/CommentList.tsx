@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Loader2 } from "lucide-react";
 import { Post } from "../data/mockData";
 import { CommentItem } from "./CommentItem";
@@ -17,7 +17,7 @@ export function CommentList({ discussionId }: CommentListProps) {
   const { data, isLoading, isError } = useQuery<PostsResponse>({
     queryKey: ["posts", discussionId],
     queryFn: () =>
-      fetch(`${API_BASE}/api/discussions/${discussionId}/posts`).then((r) => {
+      apiFetch(`${API_BASE}/api/discussions/${discussionId}/posts`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch posts");
         return r.json();
       }),

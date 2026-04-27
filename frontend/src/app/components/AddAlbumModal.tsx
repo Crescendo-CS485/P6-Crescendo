@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Loader2 } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Album } from "../data/mockData";
 
@@ -42,10 +42,13 @@ export function AddAlbumModal({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  const { data, isLoading } = useQuery<AlbumsResponse>({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<AlbumsResponse>({
     queryKey: ["albums-picker"],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => r.json()),
+      apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load albums");
+        return r.json();
+      }),
     enabled: isOpen,
     staleTime: 60_000,
   });
@@ -63,7 +66,7 @@ export function AddAlbumModal({
   async function handleAdd(albumId: string) {
     setAdding(albumId);
     try {
-      const res = await fetch(`${API_BASE}/api/lists/${listId}/albums`, {
+      const res = await apiFetch(`${API_BASE}/api/lists/${listId}/albums`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ albumId }),
@@ -108,18 +111,33 @@ export function AddAlbumModal({
 
         {/* Album list */}
         <div className="overflow-y-auto flex-1 px-6 py-3 space-y-1">
-          {isLoading && (
+          {(isLoading || isFetching) && (
             <div className="flex items-center justify-center py-12 text-[#666666]">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               <span className="text-sm">Loading albums...</span>
             </div>
           )}
 
-          {!isLoading && filtered.length === 0 && (
+          {isError && (
+            <div className="py-10 text-center">
+              <p className="text-sm text-[#999999]">
+                Couldn’t load albums{error instanceof Error && error.message ? `: ${error.message}` : "."}
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-3 inline-flex items-center justify-center px-3 py-1.5 text-sm bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !isFetching && !isError && filtered.length === 0 && (
             <p className="text-center text-sm text-[#666666] py-10">No albums found.</p>
           )}
 
-          {filtered.map((album) => {
+          {!isError && filtered.map((album) => {
             const isAdded = added.has(album.id);
             const isAddingThis = adding === album.id;
 
@@ -129,11 +147,18 @@ export function AddAlbumModal({
                 className="flex items-center gap-3 p-2.5 rounded-sm hover:bg-[#252525] transition-colors"
               >
                 {/* Cover */}
-                <img
-                  src={album.coverUrl}
-                  alt={album.title}
-                  className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
-                />
+                {album.coverUrl || album.artistImage ? (
+                  <img
+                    src={album.coverUrl || album.artistImage || undefined}
+                    alt={album.title}
+                    className="w-10 h-10 object-cover flex-shrink-0 border border-[#333333]"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 bg-[#1a1a1a] border border-[#333333] flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">

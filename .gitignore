@@ -15,6 +15,7 @@ build/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/coverage/
 
 # Lambda deployment artifacts
 backend/package/
@@ -22,6 +23,8 @@ backend/deployment.zip
 
 # Package manager
 backend/package-lock.json
+backend/.coverage
+backend/*.sqlite
 
 # OS
 .DS_Store
@@ -31,3 +34,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Session assistant log (local only; not shipped)
+chatlog.txt

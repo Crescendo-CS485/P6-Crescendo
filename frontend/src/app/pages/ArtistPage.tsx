@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, Zap, Loader2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Zap, Loader2, Music } from "lucide-react";
 import { toast } from "sonner";
 import { Artist, Discussion } from "../data/mockData";
 import { Button } from "../components/ui/button";
@@ -16,8 +17,6 @@ interface DiscussionsResponse {
   total: number;
 }
 
-type DevState = "loading" | "not-found";
-
 export function formatTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -30,13 +29,13 @@ export function formatTime(isoString: string): string {
 
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [triggering, setTriggering] = useState(false);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const { data: artistData, isLoading: artistLoading } = useQuery<ArtistResponse>({
     queryKey: ["artist", id],
     queryFn: () =>
-      fetch(`${API_BASE}/api/artists/${id}`).then((r) => {
+      apiFetch(`${API_BASE}/api/artists/${id}`).then((r) => {
         if (!r.ok) throw new Error("Not found");
         return r.json();
       }),
@@ -49,7 +48,7 @@ export default function ArtistPage() {
     useQuery<DiscussionsResponse>({
       queryKey: ["discussions", id],
       queryFn: () =>
-        fetch(`${API_BASE}/api/artists/${id}/discussions`).then((r) => {
+        apiFetch(`${API_BASE}/api/artists/${id}/discussions`).then((r) => {
           if (!r.ok) throw new Error("Failed to fetch discussions");
           return r.json();
         }),
@@ -61,9 +60,13 @@ export default function ArtistPage() {
 
   async function handleTrigger() {
     if (!id) return;
+    if (!user) {
+      toast.error("Sign in to trigger LLM activity");
+      return;
+    }
     setTriggering(true);
     try {
-      const res = await fetch(`${API_BASE}/api/events`, {
+      const res = await apiFetch(`${API_BASE}/api/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventType: "page_activation", artistId: id }),
@@ -82,8 +85,8 @@ export default function ArtistPage() {
     }
   }
 
-  const showLoading = devState === "loading" || (devState === null && artistLoading);
-  const showNotFound = devState === "not-found" || (devState === null && !artistLoading && !artist);
+  const showLoading = artistLoading;
+  const showNotFound = !artistLoading && !artist;
   const showContent = !showLoading && !showNotFound;
 
   return (
@@ -118,7 +121,13 @@ export default function ArtistPage() {
           {/* Hero */}
           <div className="flex gap-6 mb-8">
             <div className="w-40 h-40 flex-shrink-0 overflow-hidden border border-[#333333]">
-              <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
+              {artist.image ? (
+                <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center" aria-hidden="true">
+                  <Music className="w-10 h-10 text-[#444444]" />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap gap-1 mb-2">
@@ -132,7 +141,7 @@ export default function ArtistPage() {
                 ))}
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">{artist.name}</h1>
-              <p className="text-sm text-[#999999] mb-4 leading-relaxed">{artist.bio}</p>
+              <p className="text-sm text-[#999999] mb-4 leading-relaxed">{artist.bio ?? "No artist bio available."}</p>
               <div className="flex items-center gap-6 text-sm">
                 <div>
                   <span className="text-[#666666]">Activity</span>
@@ -168,6 +177,7 @@ export default function ArtistPage() {
             </Button>
             <p className="text-[11px] text-[#888888] mt-1.5">
               Schedules 3–5 synthetic fan comments across discussions (10–120s delay)
+              {!user && " — sign in to use this."}
             </p>
           </div>
 
@@ -217,50 +227,6 @@ export default function ArtistPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live
-          </Button>
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState("not-found")}
-            variant={devState === "not-found" ? "default" : "outline"}
-            className={
-              devState === "not-found"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Not Found State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

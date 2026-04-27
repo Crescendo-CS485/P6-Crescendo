@@ -1,4 +1,6 @@
-from datetime import datetime, timezone, date
+import os
+import random
+from datetime import datetime, timezone, date, timedelta
 from . import db
 from .models import Artist, Genre, User, LLMPersona, Discussion, Post, Album, List, ListAlbum
 
@@ -274,6 +276,8 @@ def seed():
 
     _seed_bots_and_discussions()
     _seed_albums()
+    _ensure_catalog_albums()
+    _ensure_spotlight_albums()
     _seed_lists()
 
 
@@ -1055,6 +1059,250 @@ def _seed_albums():
 
     db.session.commit()
     print(f"Seeded {len(ALBUMS_DATA)} albums.")
+
+
+# Synthetic padding so discovery pages have a full catalog (idempotent).
+# SEED_CATALOG_TARGET: total album rows to aim for (default 500). Set 0 on AWS to skip filler only.
+# SEED_SPOTLIGHT_ALBUMS: "false" to skip idempotent Spotlight — demo rows (default true).
+CATALOG_TITLE_PREFIX = "Crescendo Catalog #"
+
+
+def _seed_catalog_target() -> int:
+    # Production should not ship with synthetic placeholder albums showing up in UI.
+    # Default behavior:
+    # - AWS Lambda (or explicit production env): no synthetic padding unless explicitly enabled
+    # - Local/dev: pad to a fuller catalog for UX demos
+    default_target = "0" if (
+        os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("FLASK_ENV", "").lower() == "production"
+        or os.environ.get("ENV", "").lower() == "production"
+        or os.environ.get("APP_ENV", "").lower() == "production"
+    ) else "500"
+
+    raw = os.environ.get("SEED_CATALOG_TARGET", default_target).strip()
+    try:
+        return int(raw)
+    except ValueError:
+        return int(default_target)
+
+
+def _seed_spotlight_enabled() -> bool:
+    # Spotlight rows are for demoing filters; don't ship them by default in production.
+    default_enabled = "false" if (
+        os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("FLASK_ENV", "").lower() == "production"
+        or os.environ.get("ENV", "").lower() == "production"
+        or os.environ.get("APP_ENV", "").lower() == "production"
+    ) else "true"
+
+    return os.environ.get("SEED_SPOTLIGHT_ALBUMS", default_enabled).lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _max_catalog_suffix_number() -> int:
+    """Largest numeric suffix on Crescendo Catalog #NNNNN titles (0 if none)."""
+    prefix = CATALOG_TITLE_PREFIX
+    best = 0
+    for (title,) in (
+        Album.query.filter(Album.title.like(f"{prefix}%"))
+        .with_entities(Album.title)
+        .all()
+    ):
+        if not title.startswith(prefix):
+            continue
+        tail = title[len(prefix) :].strip()
+        if not tail.isdigit():
+            continue
+        best = max(best, int(tail))
+    return best
+
+
+def _ensure_catalog_albums():
+    """Pad album count to SEED_CATALOG_TARGET using existing artists (covers via artist image)."""
+    target = _seed_catalog_target()
+    if target <= 0:
+        print("SEED_CATALOG_TARGET is 0; skipping synthetic catalog padding.")
+        return
+
+    current = Album.query.count()
+    if current >= target:
+        print(f"Album count {current} meets target ({target}), skipping catalog padding.")
+        return
+
+    artists = Artist.query.all()
+    if not artists:
+        print("No artists in database; skipping catalog album padding.")
+        return
+
+    needed = target - current
+    rng = random.Random(20260425)
+    album_types = (["studio"] * 8) + ["live", "ep"]
+    next_seq = _max_catalog_suffix_number() + 1
+
+    for i in range(needed):
+        seq = next_seq + i
+        artist = artists[i % len(artists)]
+        year = rng.randint(1995, 2026)
+        release_date = date(year, rng.randint(1, 12), rng.randint(1, 28))
+        base = 6.4 + rng.random() * 2.9
+        user_score = round(min(9.9, base + rng.random() * 0.45), 1)
+        critic_score = (
+            round(min(9.9, base + (rng.random() - 0.35) * 0.55), 1)
+            if rng.random() > 0.08
+            else None
+        )
+        album = Album(
+            title=f"{CATALOG_TITLE_PREFIX}{seq:05d}",
+            artist_id=artist.id,
+            cover_url=None,
+            release_date=release_date,
+            release_year=year,
+            user_score=user_score,
+            critic_score=critic_score,
+            review_count=rng.randint(12, 8900),
+            discussion_count=rng.randint(0, 400),
+            list_appearances=rng.randint(0, 120),
+            album_type=album_types[i % len(album_types)],
+        )
+        db.session.add(album)
+        db.session.flush()
+        for genre in artist.genres:
+            album.genres.append(genre)
+
+    db.session.commit()
+    print(f"Added {needed} catalog albums (target total {target}).")
+
+
+# Mirrors `genres` in frontend/src/app/data/mockData.ts (Best Albums filter chips).
+SPOTLIGHT_FILTER_GENRES = [
+    "Rock",
+    "Hip Hop",
+    "Jazz",
+    "Electronic",
+    "Pop",
+    "Country",
+    "Indie",
+    "Blues",
+    "Folk",
+    "Dance",
+    "Alternative",
+    "R&B",
+]
+
+
+def _ensure_spotlight_albums():
+    """Idempotent demo rows so New Releases / Best Albums filters always return hits."""
+    if not _seed_spotlight_enabled():
+        print("SEED_SPOTLIGHT_ALBUMS disabled; skipping spotlight demo albums.")
+        return
+
+    artists = Artist.query.all()
+    if not artists:
+        return
+
+    def get_or_create_genre(name: str) -> Genre:
+        g = Genre.query.filter_by(name=name).first()
+        if not g:
+            g = Genre(name=name)
+            db.session.add(g)
+            db.session.flush()
+        return g
+
+    today = date.today()
+    n_art = len(artists)
+
+    # (title, release_date, genre_names, user_score, critic_score or None)
+    rows = [
+        ("Spotlight — Out Today", today, ["Pop", "Electronic"], 8.4, 8.2),
+        (
+            "Spotlight — Dropped This Week",
+            today - timedelta(days=4),
+            ["Indie", "Alternative"],
+            8.1,
+            8.0,
+        ),
+        (
+            "Spotlight — Earlier This Month",
+            today - timedelta(days=18),
+            ["R&B", "Electronic"],
+            8.3,
+            8.1,
+        ),
+        (
+            "Spotlight — Due Next Week",
+            today + timedelta(days=5),
+            ["Hip Hop"],
+            7.9,
+            7.8,
+        ),
+        (
+            "Spotlight — Upcoming Deluxe",
+            today + timedelta(days=28),
+            ["Pop"],
+            8.0,
+            None,
+        ),
+        (
+            "Spotlight — 2025 Retrospective",
+            date(2025, 8, 1),
+            ["Jazz", "Electronic"],
+            8.5,
+            8.6,
+        ),
+        (
+            "Spotlight — 2024 Late Arrival",
+            date(2024, 12, 5),
+            ["Rock", "Alternative"],
+            8.2,
+            8.0,
+        ),
+    ]
+
+    for j, gname in enumerate(SPOTLIGHT_FILTER_GENRES):
+        day = 1 + (j % 28)
+        rows.append(
+            (
+                f"Spotlight — 2026 {gname}",
+                date(2026, 4, day),
+                [gname],
+                round(7.5 + (j % 5) * 0.3, 1),
+                round(7.4 + (j % 5) * 0.3, 1),
+            )
+        )
+
+    added = 0
+    for i, (title, rd, genre_names, user_score, critic_score) in enumerate(rows):
+        if Album.query.filter_by(title=title).first():
+            continue
+        artist = artists[i % n_art]
+        album = Album(
+            title=title,
+            artist_id=artist.id,
+            cover_url=None,
+            release_date=rd,
+            release_year=rd.year,
+            user_score=user_score,
+            critic_score=critic_score,
+            review_count=220 + i * 41,
+            discussion_count=18 + i * 4,
+            list_appearances=4 + (i % 20),
+            album_type="live" if i % 9 == 0 else "studio",
+        )
+        db.session.add(album)
+        db.session.flush()
+        for gn in genre_names:
+            album.genres.append(get_or_create_genre(gn))
+        added += 1
+
+    if added:
+        db.session.commit()
+        print(f"Added {added} spotlight demo albums for time/year/genre filters.")
+    else:
+        print("Spotlight demo albums already present, skipping.")
 
 
 def _seed_lists():

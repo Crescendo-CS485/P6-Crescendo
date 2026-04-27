@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from sqlalchemy import func, desc
 from . import db
 
 artist_genres = db.Table(
@@ -32,24 +33,52 @@ class Artist(db.Model):
         "Genre", secondary=artist_genres, backref="artists", lazy="joined"
     )
 
-    def to_dict(self):
-        # Find the most recently active discussion for this artist
-        latest_disc = (
-            max(self.discussions, key=lambda d: d.last_activity_at)
-            if self.discussions else None
-        )
+    def to_dict(self, *, list_counts=None):
+        """list_counts: optional dict from batched list/search queries with keys
+        discussion, listeners, latestThread — avoids N+1 counts and lazy discussion loads."""
+        if list_counts is not None:
+            discussion_count = list_counts["discussion"]
+            listener_count = list_counts["listeners"]
+            latest_thread = list_counts["latestThread"]
+        else:
+            discussion_count = (
+                db.session.query(func.count(Discussion.id))
+                .filter(Discussion.artist_id == self.id)
+                .scalar()
+                or 0
+            )
+            listener_count = (
+                db.session.query(func.count(func.distinct(Post.author_user_id)))
+                .join(Discussion, Post.discussion_id == Discussion.id)
+                .filter(Discussion.artist_id == self.id)
+                .filter(Post.is_deleted.is_(False))
+                .scalar()
+                or 0
+            )
+            latest_disc = (
+                db.session.query(Discussion)
+                .filter(Discussion.artist_id == self.id)
+                .order_by(desc(Discussion.last_activity_at).nullslast(), desc(Discussion.id))
+                .first()
+            )
+            latest_thread = {
+                "id": str(latest_disc.id) if latest_disc else None,
+                "title": latest_disc.title if latest_disc else None,
+                "timestamp": (
+                    latest_disc.last_activity_at.isoformat()
+                    if latest_disc and latest_disc.last_activity_at
+                    else None
+                ),
+            }
         return {
             "id": str(self.id),
             "name": self.name,
             "image": self.image_url,
             "bio": self.bio,
             "activityScore": self.activity_score,
-            "discussionCount": self.discussion_count,
-            "latestThread": {
-                "id": str(latest_disc.id) if latest_disc else None,
-                "title": self.latest_thread_title,
-                "timestamp": self.latest_thread_timestamp,
-            },
+            "discussionCount": discussion_count,
+            "listenerCount": listener_count,
+            "latestThread": latest_thread,
             "genres": [g.name for g in self.genres],
         }
 
@@ -150,12 +179,15 @@ class Album(db.Model):
     def to_dict(self):
         rd = self.release_date
         formatted = f"{rd.strftime('%B')} {rd.day}, {rd.year}" if rd else None
+        # Fallback to the artist image when a specific album cover is unavailable.
+        resolved_cover_url = self.cover_url or (self.artist.image_url if self.artist else None)
         return {
             "id": str(self.id),
             "title": self.title,
             "artistId": str(self.artist_id),
             "artistName": self.artist.name if self.artist else None,
-            "coverUrl": self.cover_url,
+            "coverUrl": resolved_cover_url,
+            "artistImage": self.artist.image_url if self.artist else None,
             "releaseDate": formatted,
             "releaseYear": self.release_year,
             "userScore": self.user_score,
@@ -189,6 +221,7 @@ class List(db.Model):
             "title": self.title,
             "description": self.description,
             "createdBy": creator_name,
+            "creatorUserId": str(self.creator_user_id) if self.creator_user_id else None,
             "albumCount": album_count,
             "likes": self.like_count,
         }
@@ -205,6 +238,14 @@ class ListAlbum(db.Model):
     added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     album = db.relationship("Album")
+
+
+class ListLike(db.Model):
+    __tablename__ = "list_like"
+    id = db.Column(db.Integer, primary_key=True)
+    list_id = db.Column(db.Integer, db.ForeignKey("list.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    __table_args__ = (db.UniqueConstraint("list_id", "user_id"),)
 
 
 class LLMJob(db.Model):

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, LayoutGrid, List, Star, MessageSquare } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { BarChart3, LayoutGrid, List, Star, MessageSquare, Music } from "lucide-react";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { AlbumCard } from "../components/AlbumCard";
 import { AlbumCardSkeleton } from "../components/AlbumCardSkeleton";
 import { ErrorState, EmptyState } from "../components/PageStates";
+import { FilterBar } from "../components/FilterBar";
 import { Button } from "../components/ui/button";
 import {
   Select,
@@ -26,7 +27,6 @@ interface AlbumsResponse {
 type SortOption = "user_score" | "critic_score" | "release_date" | "review_count";
 type TimeRange = "all-time" | "2026" | "2025" | "2024";
 type ViewMode = "grid" | "list";
-type DevState = "loading" | "error" | "empty";
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: "all-time", label: "All Time" },
@@ -39,6 +39,7 @@ const PER_PAGE = 12;
 
 // Inline list-view row component
 function AlbumRow({ album, rank }: { album: Album; rank: number }) {
+  const displayCover = album.coverUrl || album.artistImage;
   return (
     <Link
       to={`/artists/${album.artistId}`}
@@ -47,11 +48,17 @@ function AlbumRow({ album, rank }: { album: Album; rank: number }) {
       <span className="text-lg font-bold text-[#444444] w-8 text-right flex-shrink-0">
         {rank}
       </span>
-      <img
-        src={album.coverUrl}
-        alt={album.title}
-        className="w-12 h-12 object-cover flex-shrink-0"
-      />
+      {displayCover ? (
+        <img
+          src={displayCover}
+          alt={album.title}
+          className="w-12 h-12 object-cover flex-shrink-0"
+        />
+      ) : (
+        <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Music className="w-6 h-6 text-[#444444]" />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-bold text-white line-clamp-1 hover:text-[#5b9dd9] transition-colors">
           {album.title}
@@ -95,7 +102,6 @@ export default function BestAlbumsPage() {
   const [sort, setSort] = useState<SortOption>("user_score");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const params = new URLSearchParams();
   params.set("sort", sort);
@@ -107,7 +113,7 @@ export default function BestAlbumsPage() {
   const { data, isLoading, isError, refetch } = useQuery<AlbumsResponse>({
     queryKey: ["albums", { timeRange, selectedGenres, sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/albums?${params}`).then((r) => {
+      apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch albums");
         return r.json();
       }),
@@ -117,11 +123,9 @@ export default function BestAlbumsPage() {
   const total = data?.total ?? 0;
   const totalPages = data?.pages ?? 0;
 
-  const effectiveLoading = devState === "loading" || (devState === null && isLoading);
-  const effectiveError = devState === "error" || (devState === null && isError);
-  const effectiveEmpty =
-    devState === "empty" ||
-    (devState === null && !isLoading && !isError && albums.length === 0);
+  const effectiveLoading = isLoading;
+  const effectiveError = isError;
+  const effectiveEmpty = !isLoading && !isError && albums.length === 0;
   const effectiveSuccess = !effectiveLoading && !effectiveError && !effectiveEmpty;
 
   const handleReset = () => {
@@ -129,7 +133,6 @@ export default function BestAlbumsPage() {
     setSelectedGenres([]);
     setSort("user_score");
     setPage(1);
-    setDevState(null);
   };
 
   return (
@@ -174,13 +177,19 @@ export default function BestAlbumsPage() {
           {/* View toggle */}
           <div className="flex border border-[#333333]">
             <button
+              type="button"
               onClick={() => setViewMode("grid")}
+              aria-label="Grid view"
+              title="Grid view"
               className={`p-1.5 ${viewMode === "grid" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
+              type="button"
               onClick={() => setViewMode("list")}
+              aria-label="List view"
+              title="List view"
               className={`p-1.5 ${viewMode === "list" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
             >
               <List className="w-4 h-4" />
@@ -189,54 +198,16 @@ export default function BestAlbumsPage() {
         </div>
       </div>
 
-      {/* Time Range Filter */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span className="text-xs text-[#666666] uppercase tracking-wide">Period:</span>
-        {TIME_RANGES.map((tr) => (
-          <button
-            key={tr.value}
-            onClick={() => { setTimeRange(tr.value); setPage(1); }}
-            className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${
-              timeRange === tr.value
-                ? "bg-[#5b9dd9] text-white"
-                : "bg-[#252525] text-[#999999] border border-[#333333] hover:text-white hover:border-[#5b9dd9]"
-            }`}
-          >
-            {tr.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Genre Filter */}
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
-        <span className="text-xs text-[#666666] uppercase tracking-wide">Genre:</span>
-        {genres.map((g) => (
-          <button
-            key={g}
-            onClick={() => {
-              setSelectedGenres((prev) =>
-                prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
-              );
-              setPage(1);
-            }}
-            className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${
-              selectedGenres.includes(g)
-                ? "bg-[#5b9dd9] text-white"
-                : "bg-[#252525] text-[#999999] border border-[#333333] hover:text-white hover:border-[#5b9dd9]"
-            }`}
-          >
-            {g}
-          </button>
-        ))}
-        {selectedGenres.length > 0 && (
-          <button
-            onClick={() => { setSelectedGenres([]); setPage(1); }}
-            className="text-xs px-3 py-1.5 rounded-sm text-[#999999] hover:text-white transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {/* Filter Bar */}
+      <FilterBar
+        selectedTimeRange={timeRange}
+        onTimeRangeChange={(v) => { setTimeRange(v as TimeRange); setPage(1); }}
+        timeRangeOptions={TIME_RANGES}
+        defaultTimeRange="all-time"
+        selectedGenres={selectedGenres}
+        onGenresChange={(g) => { setSelectedGenres(g); setPage(1); }}
+        onReset={handleReset}
+      />
 
       {/* Error */}
       {effectiveError && <ErrorState onRetry={() => refetch()} />}
@@ -318,61 +289,6 @@ export default function BestAlbumsPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live (Success)
-          </Button>
-          <Button
-            onClick={() => setDevState("error")}
-            variant={devState === "error" ? "default" : "outline"}
-            className={
-              devState === "error"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Error State
-          </Button>
-          <Button
-            onClick={() => setDevState("empty")}
-            variant={devState === "empty" ? "default" : "outline"}
-            className={
-              devState === "empty"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Empty State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

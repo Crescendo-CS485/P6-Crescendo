@@ -19,11 +19,15 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
     >
       {/* Artist Image - Square */}
       <div className="relative aspect-square overflow-hidden border-b border-[#333333]">
-        <img
-          src={artist.image}
-          alt={artist.name}
-          className="w-full h-full object-cover"
-        />
+        {artist.image ? (
+          <img
+            src={artist.image}
+            alt={artist.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-[#1a1a1a]" aria-hidden="true" />
+        )}
         {/* Activity Score Badge */}
         <div
           className={`absolute top-2 right-2 px-2 py-1 text-center font-bold text-sm ${
@@ -62,7 +66,7 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
 
         {/* Bio */}
         <p className="text-xs text-[#999999] line-clamp-3 mb-3 flex-1">
-          {artist.bio}
+          {artist.bio ?? "No bio yet."}
         </p>
 
         {/* Stats */}
@@ -71,9 +75,9 @@ export function ArtistCard({ artist, isActiveFilter }: ArtistCardProps) {
             <MessageSquare className="w-3 h-3" aria-hidden="true" />
             <span aria-hidden="true">{artist.discussionCount}</span>
           </div>
-          <div className="flex items-center gap-1" aria-label={`${(artist.discussionCount * 3.4).toFixed(0)} listeners`}>
+          <div className="flex items-center gap-1" aria-label={`${artist.listenerCount} listeners`}>
             <Users className="w-3 h-3" aria-hidden="true" />
-            <span aria-hidden="true">{(artist.discussionCount * 3.4).toFixed(0)}</span>
+            <span aria-hidden="true">{artist.listenerCount}</span>
           </div>
         </div>
 

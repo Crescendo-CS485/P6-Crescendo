@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, BarChart3 } from "lucide-react";
+import { Link } from "react-router";
+import { Loader2, BarChart3, LayoutGrid, List as ListIcon, Music } from "lucide-react";
 import { FilterBar } from "../components/FilterBar";
 import { ArtistCard } from "../components/ArtistCard";
 import { ArtistCardSkeleton } from "../components/ArtistCardSkeleton";
@@ -25,7 +25,49 @@ interface ArtistsResponse {
 }
 
 type SortOption = "activity" | "recent";
-type DevState = "loading" | "error" | "empty";
+type ViewMode = "grid" | "list";
+
+function ArtistRow({ artist }: { artist: Artist }) {
+  return (
+    <Link
+      to={`/artists/${artist.id}`}
+      className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3"
+    >
+      {artist.image ? (
+        <img src={artist.image} alt={artist.name} className="w-12 h-12 object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-12 h-12 bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Music className="w-5 h-5 text-[#444444]" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-bold text-white line-clamp-1 hover:text-[#5b9dd9] transition-colors">
+          {artist.name}
+        </h3>
+        <div className="flex gap-1 mt-1">
+          {artist.genres.slice(0, 3).map((g) => (
+            <span key={g} className="text-[10px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#666666] border border-[#333333] uppercase tracking-wide">
+              {g}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-6 flex-shrink-0 text-xs text-[#666666]">
+        <div className="hidden sm:flex flex-col items-end">
+          <span className="text-white font-bold">{artist.discussionCount}</span>
+          <span>discussions</span>
+        </div>
+        <div className="hidden sm:flex flex-col items-end">
+          <span className="text-white font-bold">{artist.listenerCount}</span>
+          <span>listeners</span>
+        </div>
+        <div className="px-2.5 py-1 bg-[#5b9dd9] text-white font-bold text-sm">
+          {artist.activityScore.toFixed(1)}
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 // Builds a URL query string, omitting falsy/empty values and expanding arrays
 export function buildParams(params: Record<string, unknown>): string {
@@ -44,13 +86,12 @@ export function buildParams(params: Record<string, unknown>): string {
 const PER_PAGE = 12;
 
 export default function DiscoveryPage() {
-  const navigate = useNavigate();
   const [activeDiscussions, setActiveDiscussions] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
   const [sort, setSort] = useState<SortOption>("activity");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const queryParams = buildParams({
     active_discussions: activeDiscussions || undefined,
@@ -64,7 +105,7 @@ export default function DiscoveryPage() {
   const { data, isLoading, isError, refetch } = useQuery<ArtistsResponse>({
     queryKey: ["artists", { activeDiscussions, selectedGenres, selectedTimeRange, sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/artists?${queryParams}`).then((r) => {
+      apiFetch(`${API_BASE}/api/artists?${queryParams}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch artists");
         return r.json();
       }),
@@ -73,13 +114,9 @@ export default function DiscoveryPage() {
   const artists = data?.artists ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.pages ?? 0;
-  const firstArtistId = data?.artists[0]?.id;
-
-  const effectiveLoading = devState === "loading" || (devState === null && isLoading);
-  const effectiveError = devState === "error" || (devState === null && isError);
-  const effectiveEmpty =
-    devState === "empty" ||
-    (devState === null && !isLoading && !isError && artists.length === 0);
+  const effectiveLoading = isLoading;
+  const effectiveError = isError;
+  const effectiveEmpty = !isLoading && !isError && artists.length === 0;
   const effectiveSuccess = !effectiveLoading && !effectiveError && !effectiveEmpty;
 
   const handleReset = () => {
@@ -88,7 +125,6 @@ export default function DiscoveryPage() {
     setSelectedTimeRange("all");
     setSort("activity");
     setPage(1);
-    setDevState(null);
   };
 
   return (
@@ -106,7 +142,7 @@ export default function DiscoveryPage() {
         </div>
 
         {/* Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <BarChart3 className="w-4 h-4 text-[#666666]" />
           <span className="text-xs text-[#999999] uppercase tracking-wide">Sort:</span>
           <Select
@@ -128,6 +164,26 @@ export default function DiscoveryPage() {
               </SelectItem>
             </SelectContent>
           </Select>
+
+          {/* View toggle */}
+          <div className="flex border border-[#333333]">
+            <button
+              onClick={() => setViewMode("grid")}
+              aria-label="Grid view"
+              title="Grid view"
+              className={`p-1.5 ${viewMode === "grid" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              aria-label="List view"
+              title="List view"
+              className={`p-1.5 ${viewMode === "list" ? "bg-[#5b9dd9] text-white" : "text-[#666666] hover:text-white"}`}
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -153,17 +209,24 @@ export default function DiscoveryPage() {
 
       {/* Loading */}
       {effectiveLoading && (
-        <div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {Array.from({ length: PER_PAGE }).map((_, i) => (
-              <ArtistCardSkeleton key={i} />
-            ))}
-          </div>
-          <div role="status" aria-live="polite" className="flex items-center justify-center mt-8 text-[#666666]">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" aria-hidden="true" />
-            <span className="text-sm">Loading artist data...</span>
-          </div>
-        </div>
+        <>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            Loading artists
+          </p>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <ArtistCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <div key={i} className="h-16 bg-[#252525] border border-[#333333] animate-pulse" />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Empty */}
@@ -172,15 +235,23 @@ export default function DiscoveryPage() {
       {/* Success */}
       {effectiveSuccess && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {artists.map((artist) => (
-              <ArtistCard
-                key={artist.id}
-                artist={artist}
-                isActiveFilter={activeDiscussions}
-              />
-            ))}
-          </div>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {artists.map((artist) => (
+                <ArtistCard
+                  key={artist.id}
+                  artist={artist}
+                  isActiveFilter={activeDiscussions}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {artists.map((artist) => (
+                <ArtistRow key={artist.id} artist={artist} />
+              ))}
+            </div>
+          )}
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
@@ -252,70 +323,6 @@ export default function DiscoveryPage() {
         </>
       )}
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live (Success)
-          </Button>
-          <Button
-            onClick={() => setDevState("error")}
-            variant={devState === "error" ? "default" : "outline"}
-            className={
-              devState === "error"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Error State
-          </Button>
-          <Button
-            onClick={() => setDevState("empty")}
-            variant={devState === "empty" ? "default" : "outline"}
-            className={
-              devState === "empty"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Empty State
-          </Button>
-          {firstArtistId && (
-            <Button
-              onClick={() => navigate(`/artists/${firstArtistId}`)}
-              variant="outline"
-              className="border-[#7c3aed] text-[#7c3aed] hover:bg-[#7c3aed] hover:text-white rounded-sm h-7 text-xs"
-            >
-              Go to Artist →
-            </Button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

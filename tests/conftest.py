@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+os.environ["ENABLE_DEBUG_ROUTES"] = "1"
 
 import pytest
 from unittest.mock import MagicMock, patch
@@ -57,13 +58,17 @@ def clean_tables(app):
     yield
     from app import db
     from app.models import (
-        LLMJob, Post, ListAlbum, List, Discussion,
+        LLMJob, Post, ListAlbum, ListLike, List, Discussion,
         LLMPersona, Album, User, Artist, Genre,
     )
+    # A test may leave the session in a failed/expired state; reset it before cleanup.
+    db.session.rollback()
+    db.session.expunge_all()
     # Order matters: children before parents
     db.session.query(LLMJob).delete()
     db.session.query(Post).delete()
     db.session.query(ListAlbum).delete()
+    db.session.query(ListLike).delete()
     db.session.query(List).delete()
     db.session.query(Discussion).delete()
     db.session.query(LLMPersona).delete()

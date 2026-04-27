@@ -1,5 +1,5 @@
 # Crescendo
--Tester
+
 A full-stack music discovery platform with AI-powered community discussions. Users can browse artists and albums, post in discussion threads, and curate personal lists. Synthetic bot personas (powered by Claude Haiku) automatically seed and respond to discussions to simulate organic fan activity — all transparently labeled.
 
 ---
@@ -20,6 +20,19 @@ Open that URL in any modern browser. From there you can:
 - **Curate lists** — create and manage personal album lists from the Lists page.
 
 > The backend API runs on AWS Lambda behind a function URL. Requests from the frontend go directly to Lambda; no separate backend URL is needed.
+
+---
+
+## Production Runtime Notes
+
+- Debug API routes (`/api/debug/*`) are disabled by default and are never registered when running on AWS Lambda.
+- Session-backed auth requires cross-site cookie settings when frontend and API are on different domains:
+  - `SESSION_COOKIE_SECURE=true`
+  - `SESSION_COOKIE_SAMESITE=None`
+  - `CORS_ORIGINS=https://<your-frontend-domain>`
+- The production frontend should set `VITE_API_BASE` to the deployed API URL.
+- **Database seeding:** `backend/run.py` runs `db.create_all()` then `seed()` on every process start (local dev or any host that uses `run.py` as the entrypoint). The **Lambda** handler (`lambda_handler.py`) only calls `create_app()` — it does **not** run `seed()` unless you add that yourself. For RDS, run migrations / initial seed explicitly (e.g. one-off job or container that executes `run.py` once) if you rely on seeded content in production.
+- **Synthetic catalog (optional on RDS):** In local dev, `seed()` pads album count toward **500** with idempotent `Crescendo Catalog #…` rows and adds **Spotlight — …** filter-demo albums once. **On AWS/Lambda (production), synthetic catalog padding defaults to off** to avoid placeholder titles in the UI. Tune with `SEED_CATALOG_TARGET` / `SEED_SPOTLIGHT_ALBUMS` (see [Environment variables reference](#5-environment-variables-reference)).
 
 ---
 
@@ -52,10 +65,7 @@ source .venv/bin/activate        # macOS / Linux
 # 2. Install all dependencies (includes pytest and pytest-mock)
 pip install -r requirements.txt
 
-# 3. Install the coverage plugin
-pip install pytest-cov
-
-# 4. Run the tests with coverage
+# 3. Run the tests with coverage
 python -m pytest ../tests/ -v --cov=app.models --cov=app.routes --cov-report=term-missing
 ```
 
@@ -68,17 +78,16 @@ npm test        # runs pytest with coverage
 
 **What you should see:**
 
-- 84 tests passing (25 model tests + 59 route tests)
-- `models.py` at 100% coverage
-- `routes.py` at 96% coverage
+- All tests passing
+- `models.py` and `routes.py` at high coverage (exact percentages may drift as the project evolves)
 
 **Test file locations:**
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/conftest.py` | — | Shared fixtures: in-memory SQLite DB, mock APScheduler, factory helpers, auto-cleanup |
-| `tests/test_models.py` | 25 | All `to_dict()` methods on Artist, User, Discussion, Post, Album, and List models |
-| `tests/test_routes.py` | 59 | All 14 route handlers in `routes.py` — filtering, pagination, error handling, bot flair, dedup, search |
+| `tests/test_models.py` | (varies) | All `to_dict()` methods on Artist, User, Discussion, Post, Album, and List models |
+| `tests/test_routes.py` | (varies) | Route handlers in `routes.py` — filtering, pagination, error handling, bot flair, dedup, search |
 
 Note: legacy test files previously located under `backend/testing/` and `backend/tests/` have been removed; the canonical test suite now lives in the top-level `tests/` directory. Run the full backend test suite from the project root with:
 
@@ -286,6 +295,28 @@ npm run dev
 
 App URL: **http://localhost:5173** (Vite proxies `/api/*` to the backend).
 
+### Start backend in production-like mode (recommended for release smoke tests)
+
+This runs the backend **the same way AWS Lambda does** (via `create_app()`), meaning:
+- **No automatic `seed()`**
+- **No APScheduler** (Lambda mode)
+- Debug routes are not registered
+
+1. Configure env (copy the template and edit):
+
+```bash
+cp backend/.env.production.local.example backend/.env
+```
+
+2. Start the backend (from `backend/`):
+
+```bash
+source .venv/bin/activate
+python run_lambda_local.py
+```
+
+Then start the frontend as usual with `npm run dev`.
+
 ### Stop services
 
 - In each terminal where a server is running, press **Ctrl+C** to stop that process.
@@ -367,20 +398,22 @@ python run.py
 
 On first run, `run.py` will:
 1. Create all database tables via SQLAlchemy
-2. Seed the database with 24 real artists, 67 albums, 4 AI bot personas, sample discussions and posts, and 3 curated lists
+2. Run `seed()`: **24** curated artists, **67** curated albums, **4** bot personas with discussions/posts, **3** lists; then pad total albums toward **`SEED_CATALOG_TARGET`** (default **500**) with synthetic catalog rows, then idempotent **Spotlight — …** albums for UI time/year/genre filters
 3. Start the Flask development server on **http://localhost:5001**
 
-You should see output like:
+You should see log lines similar to:
 
 ```
 Seeded 24 artists.
 Seeded 4 bot personas and discussions for 24 artists.
 Seeded 67 albums.
+Added … catalog albums (target total 500).
+Added … spotlight demo albums for time/year/genre filters.   # or "already present, skipping"
 Seeded 3 lists.
  * Running on http://127.0.0.1:5001
 ```
 
-> The seed is idempotent — restarting the server will not duplicate data.
+> **Idempotency:** Curated artists, bots, the 67 hand-picked albums, and lists insert once and are skipped on later runs. Catalog padding runs only while album count is below the target. Spotlight albums are skipped if their fixed titles already exist. Synthetic catalog titles use the next free `Crescendo Catalog #` suffix so partial deletes do not create duplicate titles.
 
 ---
 
@@ -426,6 +459,18 @@ You should see the Crescendo discovery page populated with real artists and albu
 | `DATABASE_URL` | Yes | PostgreSQL connection string for the single app database (`crescendo_p4`) |
 | `ANTHROPIC_API_KEY` | For LLM features | Anthropic API key for Claude Haiku (trigger / bot activity) |
 | `SECRET_KEY` | Recommended | Flask session signing key (defaults in `config.py` if omitted) |
+| `SEED_CATALOG_TARGET` | No | Default **`500`** in local/dev, **`0`** on AWS/Lambda/production. Max total albums after synthetic padding when `seed()` runs. Set **`0`** to skip synthetic **Crescendo Catalog** rows (curated + spotlight unchanged unless disabled below). |
+| `SEED_SPOTLIGHT_ALBUMS` | No | Default **`true`** in local/dev, **`false`** on AWS/Lambda/production. Set **`false`** to skip idempotent **Spotlight — …** demo albums. |
+| `CORS_ORIGINS` | Production | Comma-separated allowed browser origins for credentialed API calls (see [Production Runtime Notes](#production-runtime-notes)). |
+| `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE` | Production | Set when API and frontend are on different sites (see above). |
+
+### Readiness checklist (local or release)
+
+- [ ] `DATABASE_URL` points at the intended database; schema exists (`python run.py` once from `backend/`, or your migration process).
+- [ ] For production: `CORS_ORIGINS`, `SESSION_COOKIE_*`, and frontend `VITE_API_BASE` (or build-time API URL) match the deployed domains.
+- [ ] Decide **`SEED_CATALOG_TARGET`** / **`SEED_SPOTLIGHT_ALBUMS`** for RDS (defaults add synthetic catalog + spotlight when `run.py` runs `seed()`).
+- [ ] `pytest` / `npm test` pass before tagging or merging.
+- [ ] Lambda: confirm whether you rely on **manual/one-off seed** vs extending the handler to call `seed()` (see [Production Runtime Notes](#production-runtime-notes)).
 
 ---
 
@@ -496,7 +541,7 @@ P4 Crescendo/
 │   │   ├── auth_routes.py       # Auth endpoints
 │   │   ├── list_routes.py       # List endpoints
 │   │   ├── scheduler.py         # APScheduler singleton
-│   │   └── seed.py              # Database seed (24 artists, 67 albums, 4 bot personas)
+│   │   └── seed.py              # Idempotent seed: artists, albums, bots, lists, catalog pad, spotlight
 │   │   └── services/
 │   │       ├── llm_service.py           # Claude Haiku API calls
 │   │       ├── llm_worker.py            # Job execution logic
@@ -770,7 +815,7 @@ Create the empty database once:
 psql -h RDS_ENDPOINT -U USER -c "CREATE DATABASE crescendo_p4;"
 ```
 
-The app creates tables and seeds data automatically on first startup.
+Tables and seed data are **not** created by Lambda cold start alone. Use **`python run.py`** (or an equivalent one-off/migration step) against RDS when you want `create_all` + `seed()`, or manage schema with Alembic/migrations and insert data separately.
 
 ### Step 2 — Create the Lambda function (backend)
 
@@ -786,10 +831,14 @@ The app creates tables and seeds data automatically on first startup.
    | `DATABASE_URL` | `postgresql://USER:PASSWORD@RDS_ENDPOINT:5432/crescendo_p4` |
    | `ANTHROPIC_API_KEY` | Your key from [console.anthropic.com](https://console.anthropic.com/) |
    | `SECRET_KEY` | Any long random string |
+   | `SEED_CATALOG_TARGET` (optional) | `500` (default) or `0` to skip synthetic catalog padding |
+   | `SEED_SPOTLIGHT_ALBUMS` (optional) | `true` (default) or `false` to skip Spotlight demo albums |
 
-4. Under **Configuration → General configuration**, increase **Timeout** to at least **30 seconds** (seeding on cold start can take a few seconds).
+4. Under **Configuration → General configuration**, increase **Timeout** to at least **30 seconds** (large requests or cold starts).
+
+> If you add `seed()` to Lambda startup later, allow extra time the first time the database is empty.
 5. Under **Configuration → Function URL**, click **Create function URL**, auth type **NONE**. Copy the URL — this is your API base URL.
-6. Update the frontend's `VITE_API_BASE_URL` (or the Vite proxy target) to point at your function URL.
+6. Update the frontend's `VITE_API_BASE` (or the Vite proxy target) to point at your function URL.
 
 > If you rename the function from `crescendo-api`, open `.github/workflows/deploy-aws-lambda.yml` and update the two `--function-name crescendo-api` references to match.
 

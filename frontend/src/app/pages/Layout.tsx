@@ -1,9 +1,9 @@
 import { Outlet, NavLink, Link } from "react-router";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Artist, Album } from "../data/mockData";
@@ -19,19 +19,38 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ artists: Artist[]; albums: Album[] } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const latestSearchQueryRef = useRef(searchQuery);
+  latestSearchQueryRef.current = searchQuery;
 
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults(null);
       return;
     }
-    const t = setTimeout(() =>
-      fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`)
-        .then((r) => r.json())
-        .then(setSearchResults),
-      300
-    );
-    return () => clearTimeout(t);
+    const ac = new AbortController();
+    const qAtFire = searchQuery;
+    const t = setTimeout(() => {
+      apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(qAtFire)}`, { signal: ac.signal })
+        .then(async (r) => {
+          if (!r.ok) throw new Error("Search failed");
+          return r.json();
+        })
+        .then((data) => {
+          if (latestSearchQueryRef.current !== qAtFire) return;
+          setSearchResults(data);
+        })
+        .catch((err: unknown) => {
+          if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") {
+            return;
+          }
+          if (latestSearchQueryRef.current !== qAtFire) return;
+          setSearchResults(null);
+        });
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [searchQuery]);
 
   const navItems = [
@@ -110,7 +129,11 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            {a.image ? (
+                              <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                            )}
                             <span className="text-sm text-white">{a.name}</span>
                           </Link>
                         ))}
@@ -126,7 +149,15 @@ export default function Layout() {
                             className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
                             onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
                           >
-                            <img src={a.coverUrl} alt={a.title} className="w-8 h-8 object-cover flex-shrink-0" />
+                            {a.coverUrl || a.artistImage ? (
+                              <img
+                                src={a.coverUrl || a.artistImage || undefined}
+                                alt={a.title}
+                                className="w-8 h-8 object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                            )}
                             <div>
                               <p className="text-sm text-white">{a.title}</p>
                               <p className="text-xs text-[#999999]">{a.artistName}</p>
@@ -145,14 +176,18 @@ export default function Layout() {
               {user ? (
                 <>
                   {/* Avatar + name */}
-                  <div className="flex items-center gap-2">
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+                    aria-label="Open profile"
+                  >
                     <div className="w-7 h-7 rounded-sm bg-[#5b9dd9] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                       {user.displayName.charAt(0).toUpperCase()}
                     </div>
                     <span className="hidden sm:block text-sm text-white font-medium max-w-[120px] truncate">
                       {user.displayName}
                     </span>
-                  </div>
+                  </Link>
                   <button
                     onClick={logout}
                     aria-label="Sign out"

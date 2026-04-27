@@ -1,10 +1,73 @@
 from datetime import date, timedelta
-from flask import Blueprint, request, jsonify, session
-from sqlalchemy import nullslast
-from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User
+from flask import Blueprint, request, jsonify, session, current_app
+from sqlalchemy import nullslast, func, desc
+from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User, album_genres
 from . import db
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _artist_list_counts_by_id(artist_ids):
+    """Discussion and distinct-listener counts per artist id (two queries for the whole page)."""
+    if not artist_ids:
+        return {}, {}
+    discussion_rows = (
+        db.session.query(Discussion.artist_id, func.count(Discussion.id))
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .group_by(Discussion.artist_id)
+        .all()
+    )
+    disc = {int(aid): int(c) for aid, c in discussion_rows}
+    listener_rows = (
+        db.session.query(
+            Discussion.artist_id,
+            func.count(func.distinct(Post.author_user_id)),
+        )
+        .join(Post, Post.discussion_id == Discussion.id)
+        .join(User, User.id == Post.author_user_id)
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .filter(Post.is_deleted.is_(False))
+        .filter(User.is_bot.is_(False))
+        .group_by(Discussion.artist_id)
+        .all()
+    )
+    lstn = {int(aid): int(c) for aid, c in listener_rows}
+    return disc, lstn
+
+
+def _artist_latest_thread_payload_by_id(artist_ids):
+    """Per artist: latest discussion by last_activity_at (id tie-break). NULL last_activity_at last."""
+    empty = {"id": None, "title": None, "timestamp": None}
+    if not artist_ids:
+        return {}, empty
+    ranked_sub = (
+        db.session.query(
+            Discussion.id.label("discussion_id"),
+            Discussion.artist_id.label("aid"),
+            func.row_number()
+            .over(
+                partition_by=Discussion.artist_id,
+                order_by=(desc(Discussion.last_activity_at).nullslast(), desc(Discussion.id)),
+            )
+            .label("rn"),
+        )
+        .filter(Discussion.artist_id.in_(artist_ids))
+        .subquery()
+    )
+    candidates = (
+        db.session.query(Discussion)
+        .join(ranked_sub, Discussion.id == ranked_sub.c.discussion_id)
+        .filter(ranked_sub.c.rn == 1)
+        .all()
+    )
+    return {
+        int(d.artist_id): {
+            "id": str(d.id),
+            "title": d.title,
+            "timestamp": d.last_activity_at.isoformat() if d.last_activity_at else None,
+        }
+        for d in candidates
+    }, empty
 
 
 @bp.route("/artists")
@@ -25,7 +88,21 @@ def get_artists():
     # Sort
     sort = request.args.get("sort", "activity")
     if sort == "recent":
-        query = query.order_by(Artist.discussion_count.desc())
+        disc_count_subq = (
+            db.session.query(
+                Discussion.artist_id.label("artist_id"),
+                func.count(Discussion.id).label("discussion_count"),
+            )
+            .group_by(Discussion.artist_id)
+            .subquery()
+        )
+        query = (
+            query.outerjoin(disc_count_subq, disc_count_subq.c.artist_id == Artist.id)
+            .order_by(
+                func.coalesce(disc_count_subq.c.discussion_count, 0).desc(),
+                Artist.id.asc(),
+            )
+        )
     else:
         query = query.order_by(Artist.activity_score.desc())
 
@@ -35,14 +112,74 @@ def get_artists():
 
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    items = paginated.items
+    ids = [a.id for a in items]
+    disc_map, listen_map = _artist_list_counts_by_id(ids)
+    latest_map, latest_empty = _artist_latest_thread_payload_by_id(ids)
+    artists_out = [
+        a.to_dict(
+            list_counts={
+                "discussion": disc_map.get(a.id, 0),
+                "listeners": listen_map.get(a.id, 0),
+                "latestThread": latest_map.get(a.id, latest_empty),
+            }
+        )
+        for a in items
+    ]
+
     return jsonify(
         {
-            "artists": [a.to_dict() for a in paginated.items],
+            "artists": artists_out,
             "total": paginated.total,
             "page": paginated.page,
             "pages": paginated.pages,
         }
     )
+
+
+@bp.route("/artists", methods=["POST"])
+def create_artist():
+    if not current_app.config.get("ENABLE_CATALOG_WRITE"):
+        return jsonify({"error": "Catalog write is disabled"}), 403
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    image_url = (data.get("imageUrl") or "").strip() or None
+    bio = (data.get("bio") or "").strip() or None
+    genre_names = data.get("genres") or []
+
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    artist = Artist(
+        name=name,
+        image_url=image_url,
+        bio=bio,
+        activity_score=0.0,
+        discussion_count=0,
+        latest_thread_title=None,
+        latest_thread_timestamp=None,
+    )
+    db.session.add(artist)
+    db.session.flush()
+
+    if isinstance(genre_names, list):
+        for gname in genre_names:
+            g = (gname or "").strip()
+            if not g:
+                continue
+            genre = Genre.query.filter_by(name=g).first()
+            if not genre:
+                genre = Genre(name=g)
+                db.session.add(genre)
+                db.session.flush()
+            artist.genres.append(genre)
+
+    db.session.commit()
+    return jsonify({"artist": artist.to_dict()}), 201
 
 
 @bp.route("/artists/<int:artist_id>")
@@ -67,6 +204,9 @@ def post_event():
 
     if not artist_id:
         return jsonify({"error": "artistId is required"}), 400
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
 
     from .services.trigger_handler import TriggerHandlerService
     result = TriggerHandlerService().handle_event(event_type, int(artist_id))
@@ -113,20 +253,14 @@ def create_post(discussion_id):
     if not body:
         return jsonify({"error": "Body is required"}), 400
 
-    # Use session user if logged in; otherwise fall back to displayName/handle from body
     user_id = session.get("user_id")
-    if user_id:
-        author = User.query.get(user_id)
-    else:
-        display_name = (data.get("displayName") or "Anonymous").strip()
-        handle = (data.get("handle") or "@anonymous").strip()
-        if not handle.startswith("@"):
-            handle = f"@{handle}"
-        author = User.query.filter_by(handle=handle).first()
-        if not author:
-            author = User(display_name=display_name, handle=handle, is_bot=False)
-            db.session.add(author)
-            db.session.flush()
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    author = User.query.get(user_id)
+    if not author:
+        session.pop("user_id", None)
+        return jsonify({"error": "Invalid session"}), 401
 
     post = Post(
         discussion_id=discussion_id,
@@ -179,6 +313,12 @@ def get_discussion_posts(discussion_id):
 def get_albums():
     query = Album.query
 
+    # Include synthetic seed rows by default; opt-out with `include_synthetic=false`.
+    include_synthetic = request.args.get("include_synthetic", "true").lower() != "false"
+    if not include_synthetic:
+        query = query.filter(~Album.title.like("Crescendo Catalog #%"))
+        query = query.filter(~Album.title.like("Spotlight —%"))
+
     # Filter: genres (multi-value)
     genres = request.args.getlist("genre")
     if genres:
@@ -227,24 +367,152 @@ def get_albums():
     })
 
 
+@bp.route("/albums", methods=["POST"])
+def create_album():
+    if not current_app.config.get("ENABLE_CATALOG_WRITE"):
+        return jsonify({"error": "Catalog write is disabled"}), 403
+
+    if not session.get("user_id"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    artist_id = data.get("artistId")
+    cover_url = (data.get("coverUrl") or "").strip() or None
+    release_year = data.get("releaseYear")
+    album_type = (data.get("albumType") or "studio").strip() or "studio"
+    genre_names = data.get("genres") or []
+
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    if not artist_id:
+        return jsonify({"error": "artistId is required"}), 400
+
+    if isinstance(artist_id, bool):
+        return jsonify({"error": "artistId must be a valid integer"}), 400
+    if isinstance(artist_id, float):
+        if not artist_id.is_integer():
+            return jsonify({"error": "artistId must be a valid integer"}), 400
+        artist_id_int = int(artist_id)
+    elif isinstance(artist_id, int):
+        artist_id_int = artist_id
+    else:
+        try:
+            artist_id_int = int(str(artist_id).strip())
+        except (TypeError, ValueError):
+            return jsonify({"error": "artistId must be a valid integer"}), 400
+
+    artist = Artist.query.get(artist_id_int)
+    if not artist:
+        return jsonify({"error": "Artist not found"}), 404
+
+    year = None
+    if release_year is not None and release_year != "":
+        if isinstance(release_year, bool):
+            return jsonify({"error": "releaseYear must be a valid integer"}), 400
+        if isinstance(release_year, float):
+            if not release_year.is_integer():
+                return jsonify({"error": "releaseYear must be a valid integer"}), 400
+            year = int(release_year)
+        elif isinstance(release_year, int):
+            year = release_year
+        else:
+            try:
+                year = int(str(release_year).strip())
+            except (TypeError, ValueError):
+                return jsonify({"error": "releaseYear must be a valid integer"}), 400
+    if year is not None and (year < 1 or year > 9999):
+        return jsonify({"error": "releaseYear must be between 1 and 9999"}), 400
+    release_date = date(year, 1, 1) if year else None
+    album = Album(
+        title=title,
+        artist_id=artist.id,
+        cover_url=cover_url,
+        release_date=release_date,
+        release_year=year,
+        user_score=0.0,
+        critic_score=None,
+        review_count=0,
+        discussion_count=0,
+        list_appearances=0,
+        album_type=album_type,
+    )
+    db.session.add(album)
+    db.session.flush()
+
+    if isinstance(genre_names, list):
+        for gname in genre_names:
+            g = (gname or "").strip()
+            if not g:
+                continue
+            genre = Genre.query.filter_by(name=g).first()
+            if not genre:
+                genre = Genre(name=g)
+                db.session.add(genre)
+                db.session.flush()
+            album.genres.append(genre)
+
+    db.session.commit()
+    return jsonify({"album": album.to_dict()}), 201
+
+
 @bp.route("/albums/genres")
 def get_album_genres():
-    genres = Genre.query.order_by(Genre.name).all()
+    stats_rows = (
+        db.session.query(
+            Genre.id.label("genre_id"),
+            Genre.name.label("genre_name"),
+            func.count(Album.id).label("album_count"),
+            func.avg(Album.user_score).label("avg_score"),
+        )
+        .outerjoin(album_genres, album_genres.c.genre_id == Genre.id)
+        .outerjoin(Album, Album.id == album_genres.c.album_id)
+        .group_by(Genre.id, Genre.name)
+        .order_by(Genre.name)
+        .all()
+    )
+
+    cover_ranked = (
+        db.session.query(
+            album_genres.c.genre_id.label("genre_id"),
+            func.coalesce(Album.cover_url, Artist.image_url).label("cover_url"),
+            func.row_number()
+            .over(
+                partition_by=album_genres.c.genre_id,
+                order_by=(nullslast(Album.user_score.desc()), Album.id.asc()),
+            )
+            .label("rn"),
+        )
+        .select_from(album_genres)
+        .join(Album, Album.id == album_genres.c.album_id)
+        .outerjoin(Artist, Artist.id == Album.artist_id)
+        .filter(func.coalesce(Album.cover_url, Artist.image_url).isnot(None))
+        .subquery()
+    )
+
+    cover_rows = (
+        db.session.query(cover_ranked.c.genre_id, cover_ranked.c.cover_url)
+        .filter(cover_ranked.c.rn <= 4)
+        .order_by(cover_ranked.c.genre_id.asc(), cover_ranked.c.rn.asc())
+        .all()
+    )
+    cover_map = {}
+    for genre_id, cover_url in cover_rows:
+        cover_map.setdefault(int(genre_id), []).append(cover_url)
+
     result = []
-    for genre in genres:
-        albums = genre.albums
-        if not albums:
+    for row in stats_rows:
+        count = int(row.album_count or 0)
+        if count == 0:
             continue
-        count = len(albums)
-        scores = [a.user_score for a in albums if a.user_score is not None]
-        avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
-        cover_images = [a.cover_url for a in albums[:4] if a.cover_url]
+        avg_score = round(float(row.avg_score), 1) if row.avg_score is not None else 0.0
         result.append({
-            "name": genre.name,
+            "name": row.genre_name,
             "albumCount": count,
             "avgScore": avg_score,
-            "coverImages": cover_images,
+            "coverImages": cover_map.get(int(row.genre_id), []),
         })
+
     result.sort(key=lambda x: x["albumCount"], reverse=True)
     return jsonify({"genres": result})
 
@@ -284,6 +552,7 @@ def get_stats():
         "postCount": post_count,
         "botCount": bot_count,
         "userCount": user_count,
+        "catalogWriteEnabled": bool(current_app.config.get("ENABLE_CATALOG_WRITE")),
     })
 
 
@@ -296,38 +565,20 @@ def search():
     pattern = f"%{q}%"
     artists = Artist.query.filter(Artist.name.ilike(pattern)).limit(5).all()
     albums = Album.query.filter(Album.title.ilike(pattern)).limit(5).all()
+    a_ids = [a.id for a in artists]
+    disc_map, listen_map = _artist_list_counts_by_id(a_ids)
+    latest_map, latest_empty = _artist_latest_thread_payload_by_id(a_ids)
 
     return jsonify({
-        "artists": [a.to_dict() for a in artists],
+        "artists": [
+            a.to_dict(
+                list_counts={
+                    "discussion": disc_map.get(a.id, 0),
+                    "listeners": listen_map.get(a.id, 0),
+                    "latestThread": latest_map.get(a.id, latest_empty),
+                }
+            )
+            for a in artists
+        ],
         "albums": [a.to_dict() for a in albums],
     })
-
-
-@bp.route("/debug/jobs")
-def debug_jobs():
-    """Shows the last 20 LLMJobs and their status/errors."""
-    jobs = LLMJob.query.order_by(LLMJob.created_at.desc()).limit(20).all()
-    return jsonify([
-        {
-            "id": j.id,
-            "artist_id": j.artist_id,
-            "discussion_id": j.discussion_id,
-            "status": j.status,
-            "scheduled_time": j.scheduled_time.isoformat(),
-            "completed_at": j.completed_at.isoformat() if j.completed_at else None,
-            "error_msg": j.error_msg,
-        }
-        for j in jobs
-    ])
-
-
-@bp.route("/debug/run-job/<int:job_id>", methods=["POST"])
-def debug_run_job(job_id):
-    """Synchronously runs a pending job — useful for testing without waiting for the scheduler."""
-    from .services.llm_worker import _execute_job
-    try:
-        _execute_job(job_id)
-        job = LLMJob.query.get(job_id)
-        return jsonify({"status": job.status, "error_msg": job.error_msg})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500

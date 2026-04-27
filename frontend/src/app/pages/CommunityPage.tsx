@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare, TrendingUp, Clock, Bot, Users, Info } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { Link } from "react-router";
 import { ErrorState, EmptyState } from "../components/PageStates";
-import { Button } from "../components/ui/button";
 
 interface Discussion {
   id: string;
@@ -24,7 +23,6 @@ interface DiscussionsResponse {
 }
 
 type SortOption = "recent" | "popular";
-type DevState = "loading" | "error" | "empty";
 
 function formatRelativeTime(isoString: string): string {
   const date = new Date(isoString);
@@ -76,22 +74,33 @@ function DiscussionCard({ discussion }: { discussion: Discussion }) {
 export default function CommunityPage() {
   const [sort, setSort] = useState<SortOption>("recent");
   const [page, setPage] = useState(1);
-  const [devState, setDevState] = useState<DevState | null>(null);
 
   const PER_PAGE = 20;
 
   const { data, isLoading, isError, refetch } = useQuery<DiscussionsResponse>({
     queryKey: ["discussions", { sort, page }],
     queryFn: () =>
-      fetch(`${API_BASE}/api/discussions?sort=${sort}&page=${page}&per_page=${PER_PAGE}`).then((r) => {
+      apiFetch(`${API_BASE}/api/discussions?sort=${sort}&page=${page}&per_page=${PER_PAGE}`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch discussions");
         return r.json();
       }),
   });
 
-  const { data: stats } = useQuery<{ artistCount: number; userCount: number }>({
+  const { data: stats } = useQuery<{
+    artistCount: number;
+    userCount: number;
+    catalogWriteEnabled?: boolean;
+  }>({
     queryKey: ["stats"],
-    queryFn: () => fetch(`${API_BASE}/api/stats`).then((r) => r.json()),
+    queryFn: async () => {
+      try {
+        const r = await apiFetch(`${API_BASE}/api/stats`);
+        if (!r.ok) return { artistCount: 0, userCount: 0 };
+        return r.json();
+      } catch {
+        return { artistCount: 0, userCount: 0 };
+      }
+    },
     staleTime: 60_000,
   });
 
@@ -99,11 +108,9 @@ export default function CommunityPage() {
   const total = data?.total ?? 0;
   const totalPages = data?.pages ?? 0;
 
-  const effectiveLoading = devState === "loading" || (devState === null && isLoading);
-  const effectiveError = devState === "error" || (devState === null && isError);
-  const effectiveEmpty =
-    devState === "empty" ||
-    (devState === null && !isLoading && !isError && discussions.length === 0);
+  const effectiveLoading = isLoading;
+  const effectiveError = isError;
+  const effectiveEmpty = !isLoading && !isError && discussions.length === 0;
   const effectiveSuccess = !effectiveLoading && !effectiveError && !effectiveEmpty;
 
   return (
@@ -260,61 +267,6 @@ export default function CommunityPage() {
         </aside>
       </div>
 
-      {/* Developer Controls */}
-      <div className="mt-8 p-5 bg-[#252525] border border-[#333333]">
-        <h3 className="text-white font-bold mb-2 text-sm flex items-center gap-2">
-          <span>🛠</span> Developer Controls
-        </h3>
-        <p className="text-xs text-[#999999] mb-3">
-          Test different UI states and interface behaviors
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setDevState("loading")}
-            variant={devState === "loading" ? "default" : "outline"}
-            className={
-              devState === "loading"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Loading State
-          </Button>
-          <Button
-            onClick={() => setDevState(null)}
-            variant={devState === null ? "default" : "outline"}
-            className={
-              devState === null
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Live (Success)
-          </Button>
-          <Button
-            onClick={() => setDevState("error")}
-            variant={devState === "error" ? "default" : "outline"}
-            className={
-              devState === "error"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Error State
-          </Button>
-          <Button
-            onClick={() => setDevState("empty")}
-            variant={devState === "empty" ? "default" : "outline"}
-            className={
-              devState === "empty"
-                ? "bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-7 text-xs"
-                : "border-[#333333] text-[#999999] hover:bg-[#1a1a1a] hover:text-white rounded-sm h-7 text-xs"
-            }
-          >
-            Empty State
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

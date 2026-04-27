@@ -27,14 +27,15 @@ export interface Discussion {
 export interface Artist {
   id: string;
   name: string;
-  image: string;
-  bio: string;
+  image: string | null;
+  bio: string | null;
   activityScore: number;
   discussionCount: number;
+  listenerCount: number;
   latestThread: {
-    id: string;
-    title: string;
-    timestamp: string;
+    id: string | null;
+    title: string | null;
+    timestamp: string | null;
   };
   genres: string[];
 }
@@ -44,9 +45,10 @@ export interface Album {
   title: string;
   artistId: string;
   artistName: string;
-  coverUrl: string;
-  releaseDate: string;
-  releaseYear: number;
+  coverUrl: string | null;
+  artistImage?: string | null;
+  releaseDate: string | null;
+  releaseYear: number | null;
   userScore: number;
   criticScore: number | null;
   reviewCount: number;
@@ -59,10 +61,12 @@ export interface Album {
 export interface UserList {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   createdBy: string;
+  creatorUserId: string | null;
   albumCount: number;
   likes: number;
+  userHasLiked: boolean;
 }
 
 export interface UserListDetail extends UserList {
@@ -76,8 +80,10 @@ export const mockLists: UserList[] = [
     description:
       "A curated collection of the strongest releases in the first quarter of 2026. From indie bedroom recordings to polished electronic productions.",
     createdBy: "MusicEnthusiast",
+    creatorUserId: null,
     albumCount: 5,
     likes: 142,
+    userHasLiked: false,
   },
   {
     id: "list-2",
@@ -85,8 +91,10 @@ export const mockLists: UserList[] = [
     description:
       "From ambient to techno, these albums define what electronic music can achieve. A journey through synthesizers, samples, and studio craft.",
     createdBy: "GenreHistorian",
+    creatorUserId: null,
     albumCount: 8,
     likes: 97,
+    userHasLiked: false,
   },
   {
     id: "list-3",
@@ -94,8 +102,10 @@ export const mockLists: UserList[] = [
     description:
       "Overlooked bedroom recordings and DIY releases deserving far more attention. These artists are building something special.",
     createdBy: "CriticalEar",
+    creatorUserId: null,
     albumCount: 6,
     likes: 63,
+    userHasLiked: false,
   },
 ];
 
@@ -104,6 +114,7 @@ export const genres = [
   "Hip Hop",
   "Jazz",
   "Electronic",
+  "R&B",
   "Pop",
   "Country",
   "Indie",

@@ -29,7 +29,7 @@ UI state management:
 | Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
 | Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
 | Community stats panel | Open Community page; calls `GET /api/stats` (alongside discussions fetch). | Sidebar displays Active Artists and Community Members from the stats response. |
-| Trigger event | On the Artist page, click `Trigger LLM Activity`; `POST /api/events` with `artistId` and required `eventType` (for example, `page_activation`). | Status 200; a success toast notification appears in the UI. |
+| Trigger event | While signed in, on the Artist page click `Trigger LLM Activity`; `POST /api/events` with `artistId` and required `eventType` (for example, `page_activation`) and session cookie. | Status 200; a success toast notification appears in the UI. Signed-out users can click the control and receive a sign-in toast/hint instead of scheduling jobs. |
 | Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
 | Load discussion list | Artist page mount; calls `GET /api/artists/<id>/discussions`. | List of discussion threads renders beneath the profile. |
 | Open thread and load posts | Click discussion card; calls `GET /api/discussions/<id>/posts`. | Post bodies render in chronological order. |

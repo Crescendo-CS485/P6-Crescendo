@@ -38,7 +38,7 @@ class TestArtistToDict:
         assert d["activityScore"] == 9.4
         assert d["image"] == "https://img.com/luna.jpg"
         assert d["bio"] == "Singer"
-        assert d["discussionCount"] == 5
+        assert d["discussionCount"] == 1
         assert set(d["genres"]) == {"Pop", "Indie"}
         assert d["latestThread"]["id"] is not None
 

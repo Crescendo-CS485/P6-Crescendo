@@ -63,6 +63,17 @@ export default function ListDetailPage() {
 
   const listQueryUser = user?.id ?? "anon";
 
+  useEffect(() => {
+    setShowForkBanner(false);
+    setShowAddModal(false);
+    setForking(false);
+    setRemoving(null);
+    setViewMode("grid");
+    setLiking(false);
+    setLocalLiked(false);
+    setLocalLikeCount(0);
+  }, [id]);
+
   const { data, isLoading, isError } = useQuery<ListDetailResponse>({
     queryKey: ["list", id, listQueryUser],
     queryFn: () =>
@@ -125,6 +136,7 @@ export default function ListDetailPage() {
         return;
       }
       const result = (await res.json()) as { list: { id: string } };
+      setShowForkBanner(false);
       navigate(`/lists/${result.list.id}`);
     } catch {
       toast.error("Network error — could not reach the server");

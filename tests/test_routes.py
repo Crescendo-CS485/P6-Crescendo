@@ -769,7 +769,8 @@ class TestGetAllDiscussions:
 class TestGetStats:
     """Spec test 41"""
 
-    def test_correct_counts(self, client, make_artist, make_user, make_discussion, make_post):
+    def test_correct_counts(self, client, app, make_artist, make_user, make_discussion, make_post):
+        app.config["ENABLE_CATALOG_WRITE"] = False
         a1 = make_artist(name="Stat1")
         a2 = make_artist(name="Stat2")
         a3 = make_artist(name="Stat3")

@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, session, current_app
-from sqlalchemy import nullslast, func
+from sqlalchemy import nullslast, func, desc
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User, album_genres
 from . import db
 
@@ -34,37 +34,37 @@ def _artist_list_counts_by_id(artist_ids):
 
 
 def _artist_latest_thread_payload_by_id(artist_ids):
-    """Per artist: latest discussion by last_activity_at (id tie-break). One grouped query + one join."""
+    """Per artist: latest discussion by last_activity_at (id tie-break). NULL last_activity_at last."""
     empty = {"id": None, "title": None, "timestamp": None}
     if not artist_ids:
         return {}, empty
-    mx_sub = (
+    ranked_sub = (
         db.session.query(
+            Discussion.id.label("discussion_id"),
             Discussion.artist_id.label("aid"),
-            func.max(Discussion.last_activity_at).label("mx"),
+            func.row_number()
+            .over(
+                partition_by=Discussion.artist_id,
+                order_by=(desc(Discussion.last_activity_at).nullslast(), desc(Discussion.id)),
+            )
+            .label("rn"),
         )
         .filter(Discussion.artist_id.in_(artist_ids))
-        .group_by(Discussion.artist_id)
         .subquery()
     )
     candidates = (
         db.session.query(Discussion)
-        .join(mx_sub, Discussion.artist_id == mx_sub.c.aid)
-        .filter(Discussion.last_activity_at == mx_sub.c.mx)
+        .join(ranked_sub, Discussion.id == ranked_sub.c.discussion_id)
+        .filter(ranked_sub.c.rn == 1)
         .all()
     )
-    best = {}
-    for d in candidates:
-        cur = best.get(d.artist_id)
-        if cur is None or d.id > cur.id:
-            best[d.artist_id] = d
     return {
-        int(aid): {
+        int(d.artist_id): {
             "id": str(d.id),
             "title": d.title,
             "timestamp": d.last_activity_at.isoformat() if d.last_activity_at else None,
         }
-        for aid, d in best.items()
+        for d in candidates
     }, empty
 
 

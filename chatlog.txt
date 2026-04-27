@@ -272,3 +272,11 @@ PROMPT:
 
 RESPONSE:
 After pushing the initial fixes for the 4 new comments, CI backend tests failed due to a SQLAlchemy session rollback cascade during test cleanup. Updated `tests/conftest.py` cleanup fixture to `rollback()` and `expunge_all()` before table deletes so failed/expired session state does not poison subsequent tests.
+
+---
+
+PROMPT:
+10 new comments
+
+RESPONSE:
+Triaged the latest Copilot thread: fixed `create_album` so non-integer JSON floats (e.g. `2026.7`) cannot silently coerce via `int()` (restores failing CI test), added strict `artistId` parsing with 400s, aligned `FilterBar` grid column counting with when the genre section actually renders, made `ListsPage` lists query throw on non-OK responses, added missing grid/list `aria-label`/`title` on `BestAlbumsPage`, and added a route test for invalid `artistId` values.

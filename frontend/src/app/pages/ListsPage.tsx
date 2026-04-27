@@ -87,7 +87,11 @@ export default function ListsPage() {
 
   const { data, isLoading, isError } = useQuery<ListsResponse>({
     queryKey: ["lists"],
-    queryFn: () => apiFetch(`${API_BASE}/api/lists`).then((r) => r.json()),
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/lists`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load lists");
+        return r.json();
+      }),
   });
 
   const lists = data?.lists ?? [];

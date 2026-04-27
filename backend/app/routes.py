@@ -302,7 +302,21 @@ def create_album():
     if not artist_id:
         return jsonify({"error": "artistId is required"}), 400
 
-    artist = Artist.query.get(int(artist_id))
+    if isinstance(artist_id, bool):
+        return jsonify({"error": "artistId must be a valid integer"}), 400
+    if isinstance(artist_id, float):
+        if not artist_id.is_integer():
+            return jsonify({"error": "artistId must be a valid integer"}), 400
+        artist_id_int = int(artist_id)
+    elif isinstance(artist_id, int):
+        artist_id_int = artist_id
+    else:
+        try:
+            artist_id_int = int(str(artist_id).strip())
+        except (TypeError, ValueError):
+            return jsonify({"error": "artistId must be a valid integer"}), 400
+
+    artist = Artist.query.get(artist_id_int)
     if not artist:
         return jsonify({"error": "Artist not found"}), 404
 
@@ -310,13 +324,17 @@ def create_album():
     if release_year is not None and release_year != "":
         if isinstance(release_year, bool):
             return jsonify({"error": "releaseYear must be a valid integer"}), 400
-        try:
-            if isinstance(release_year, str):
-                year = int(release_year.strip())
-            else:
-                year = int(release_year)
-        except (TypeError, ValueError):
-            return jsonify({"error": "releaseYear must be a valid integer"}), 400
+        if isinstance(release_year, float):
+            if not release_year.is_integer():
+                return jsonify({"error": "releaseYear must be a valid integer"}), 400
+            year = int(release_year)
+        elif isinstance(release_year, int):
+            year = release_year
+        else:
+            try:
+                year = int(str(release_year).strip())
+            except (TypeError, ValueError):
+                return jsonify({"error": "releaseYear must be a valid integer"}), 400
     release_date = date(year, 1, 1) if year else None
     album = Album(
         title=title,

@@ -51,7 +51,12 @@ export function FilterBar({
   };
 
   const resolvedTimeRangeOptions = timeRangeOptions ?? timeRanges;
-  const sectionCount = [!!onActiveDiscussionsChange, !!onTimeRangeChange, !!onGenresChange].filter(Boolean).length;
+  const showGenreSection = Boolean(onGenresChange && selectedGenres !== undefined);
+  const sectionCount = [
+    !!onActiveDiscussionsChange,
+    !!onTimeRangeChange,
+    showGenreSection,
+  ].filter(Boolean).length;
   const gridClass = sectionCount >= 3 ? "grid-cols-1 md:grid-cols-3" : sectionCount === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 max-w-sm";
 
   const activeFilterCount =

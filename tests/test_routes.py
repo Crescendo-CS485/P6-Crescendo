@@ -647,6 +647,25 @@ class TestCreateAlbum:
             })
             assert resp.status_code == 400
 
+    def test_invalid_artist_id_returns_400(self, client, app, make_artist):
+        app.config["ENABLE_CATALOG_WRITE"] = True
+        artist = make_artist(name="ArtistId Artist")
+        db.session.commit()
+        reg = client.post("/api/auth/register", json={
+            "displayName": "ArtistId Validator",
+            "handle": "artistid_validator",
+            "email": "artistid_validator@example.com",
+            "password": "password123",
+        })
+        assert reg.status_code == 201
+
+        for bad_id in ("abc", True, 12.7):
+            resp = client.post("/api/albums", json={
+                "title": "Bad Artist",
+                "artistId": bad_id,
+            })
+            assert resp.status_code == 400
+
 
 # ── GET /api/albums/genres ──────────────────────────────────────────────
 

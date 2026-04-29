@@ -17,6 +17,8 @@ UI state management:
 - Content Discovery: Verified through the Best Albums, New Releases, and Genres pages.
 - User Lists: Verified via list creation, list retrieval, and adding/removing albums for personal
   album collections.
+- Notifications: Verified via discussion reply notification creation, unread counts, and
+  mark-read actions.
 - Global Search: Verified through debounced API queries and result navigation.
 - Community Overview: Verified via discussion feed loading and community stats retrieval.
 
@@ -39,7 +41,9 @@ UI state management:
 | Sign in (invalid) | Submit Sign In form with incorrect password. | 401 response; error message displayed in the login modal. |
 | Session persistence | Sign in and then navigate to a different page. | `GET /api/auth/me` on mount restores the user's session in the header. |
 | Sign out | Click Sign out; calls `POST /api/auth/logout`. | Header reverts to Sign In / Join guest state. |
+| Profile discussions | Open Profile while signed in; calls `GET /api/me/discussions?per_page=10`. | Profile shows discussion threads the user started or joined, each linking to `/discussions/<id>`. |
 | Authenticated post | Submit post while logged in. | `POST /api/discussions/<id>/posts` follows the signed-in client flow; the backend derives the author from the session, the new post appears with the logged-in identity, and no separate prompt for display name/handle appears during submission. |
+| Reply notification | Another human user or an LLM bot posts in a discussion the signed-in user participated in; header polls `GET /api/notifications`. | Bell shows the unread count, dropdown displays the reply, clicking it marks the notification read with `POST /api/notifications/<id>/read` and navigates to the discussion. |
 | Default album list | Open Best Albums; calls `GET /api/albums`. | Album cards render with title, artist, and user scores. |
 | Filter by year | Select year (e.g., 2026); `GET /api/albums?time_range=2026`. | UI displays only albums released in the specified year. |
 | Sort by critic score | Switch sort; re-fetches with `?sort=critic_score`. | Album order matches the backend critic score ranking. |

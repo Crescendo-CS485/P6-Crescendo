@@ -58,7 +58,7 @@ def clean_tables(app):
     yield
     from app import db
     from app.models import (
-        LLMJob, Post, ListAlbum, ListLike, List, Discussion,
+        LLMJob, Notification, Post, ListAlbum, ListLike, List, Discussion,
         LLMPersona, Album, User, Artist, Genre,
     )
     # A test may leave the session in a failed/expired state; reset it before cleanup.
@@ -66,6 +66,7 @@ def clean_tables(app):
     db.session.expunge_all()
     # Order matters: children before parents
     db.session.query(LLMJob).delete()
+    db.session.query(Notification).delete()
     db.session.query(Post).delete()
     db.session.query(ListAlbum).delete()
     db.session.query(ListLike).delete()

@@ -1,7 +1,7 @@
 from datetime import date, timedelta, datetime, timezone
 from flask import Blueprint, request, jsonify, session, current_app
-from sqlalchemy import nullslast, func, desc
-from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User, album_genres
+from sqlalchemy import nullslast, func, desc, or_, select
+from .models import Artist, Genre, Discussion, Post, Album, User, Notification, album_genres
 from . import db
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -340,10 +340,14 @@ def create_post(discussion_id):
         body=body,
     )
     db.session.add(post)
+    db.session.flush()
 
     # Keep discussion counters in sync
     discussion.post_count = (discussion.post_count or 0) + 1
     discussion.last_activity_at = datetime.now(timezone.utc)
+
+    from .services.notification_service import create_reply_notifications
+    create_reply_notifications(discussion, post)
 
     db.session.commit()
 
@@ -355,6 +359,96 @@ def create_post(discussion_id):
         )
 
     return jsonify({"post": post.to_dict(), "llmTriggered": trigger_llm}), 201
+
+
+@bp.route("/notifications")
+def get_notifications():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    limit = request.args.get("limit", 20, type=int)
+    limit = min(max(limit or 20, 1), 50)
+    notifications = (
+        Notification.query.filter_by(user_id=user_id)
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
+        .limit(limit)
+        .all()
+    )
+    unread_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    return jsonify({
+        "notifications": [n.to_dict() for n in notifications],
+        "unreadCount": unread_count,
+    })
+
+
+@bp.route("/notifications/<int:notification_id>/read", methods=["POST"])
+def mark_notification_read(notification_id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    notification = Notification.query.filter_by(id=notification_id, user_id=user_id).first()
+    if not notification:
+        return jsonify({"error": "Notification not found"}), 404
+
+    notification.is_read = True
+    db.session.commit()
+    return jsonify({"notification": notification.to_dict()}), 200
+
+
+@bp.route("/notifications/read-all", methods=["POST"])
+def mark_all_notifications_read():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    updated = (
+        Notification.query.filter_by(user_id=user_id, is_read=False)
+        .update({"is_read": True}, synchronize_session=False)
+    )
+    db.session.commit()
+    return jsonify({"updated": updated}), 200
+
+
+@bp.route("/me/discussions")
+def get_my_discussions():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 10, type=int)
+    per_page = min(max(per_page or 10, 1), 50)
+
+    participated = (
+        select(Post.discussion_id)
+        .where(Post.author_user_id == user_id)
+        .where(Post.is_deleted.is_(False))
+    )
+    paginated = (
+        Discussion.query.filter(
+            or_(
+                Discussion.author_user_id == user_id,
+                Discussion.id.in_(participated),
+            )
+        )
+        .order_by(Discussion.last_activity_at.desc(), Discussion.id.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    discussions = []
+    for discussion in paginated.items:
+        payload = discussion.to_dict()
+        payload["isAuthor"] = discussion.author_user_id == user_id
+        discussions.append(payload)
+
+    return jsonify({
+        "discussions": discussions,
+        "total": paginated.total,
+        "page": paginated.page,
+        "pages": paginated.pages,
+    })
 
 
 @bp.route("/discussions/<int:discussion_id>/posts")

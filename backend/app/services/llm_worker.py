@@ -105,10 +105,14 @@ def _execute_job(job_id: int, *, raise_errors: bool = True) -> bool:
             body=comment_text,
         )
         db.session.add(post)
+        db.session.flush()
 
         # Update discussion metadata
         discussion.post_count = (discussion.post_count or 0) + 1
         discussion.last_activity_at = datetime.now(timezone.utc)
+
+        from .notification_service import create_reply_notifications
+        create_reply_notifications(discussion, post)
 
         # Update artist scores
         activity_svc = ActivityAggregationService()

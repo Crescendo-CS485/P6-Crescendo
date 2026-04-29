@@ -1,16 +1,46 @@
 import { Outlet, NavLink, Link, useNavigate } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
-import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut, Loader2 } from "lucide-react";
+import { Bell, Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut, Loader2 } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Artist, Album } from "../data/mockData";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+interface NotificationItem {
+  id: string;
+  type: "reply" | "llm_reply";
+  message: string;
+  isRead: boolean;
+  createdAt: string | null;
+  discussionId: string;
+  postId: string;
+  actor: {
+    displayName: string;
+    handle: string;
+    isBot: boolean;
+    botLabel?: string | null;
+  } | null;
+  discussion: {
+    id: string;
+    title: string;
+    artistId: string | null;
+    artistName: string | null;
+  };
+}
+
+interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}
 
 export default function Layout() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [authModal, setAuthModal] = useState<{ open: boolean; tab: "join" | "signin" }>({
     open: false,
     tab: "join",
@@ -24,7 +54,35 @@ export default function Layout() {
   const [searchError, setSearchError] = useState(false);
   const [completedSearchQuery, setCompletedSearchQuery] = useState("");
   const latestSearchQueryRef = useRef(searchQuery);
+  const notificationMenuRef = useRef<HTMLDivElement | null>(null);
   latestSearchQueryRef.current = searchQuery;
+
+  const { data: notificationData, isLoading: notificationsLoading } =
+    useQuery<NotificationsResponse>({
+      queryKey: ["notifications"],
+      queryFn: () =>
+        apiFetch(`${API_BASE}/api/notifications`).then((r) => {
+          if (!r.ok) throw new Error("Failed to fetch notifications");
+          return r.json();
+        }),
+      enabled: !!user,
+      refetchInterval: user ? 15000 : false,
+    });
+
+  const markNotificationRead = useMutation({
+    mutationFn: (notificationId: string) =>
+      apiFetch(`${API_BASE}/api/notifications/${notificationId}/read`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
+  const markAllNotificationsRead = useMutation({
+    mutationFn: () => apiFetch(`${API_BASE}/api/notifications/read-all`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
 
   useEffect(() => {
     const qAtFire = searchQuery.trim();
@@ -71,6 +129,28 @@ export default function Layout() {
     };
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (!user) setNotificationsOpen(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      const target = event.target;
+      if (
+        notificationMenuRef.current &&
+        target instanceof Node &&
+        !notificationMenuRef.current.contains(target)
+      ) {
+        setNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [notificationsOpen]);
+
   const navItems = [
     { to: "/", label: "Discovery", icon: Radio },
     { to: "/best-albums", label: "Best Albums", icon: TrendingUp },
@@ -106,6 +186,88 @@ export default function Layout() {
     } else if (firstAlbum) {
       openSearchResult(firstAlbum);
     }
+  };
+
+  const notificationItems = user ? notificationData?.notifications ?? [] : [];
+  const unreadCount = user ? notificationData?.unreadCount ?? 0 : 0;
+
+  const openNotification = (notification: NotificationItem) => {
+    if (!notification.isRead) {
+      markNotificationRead.mutate(notification.id);
+    }
+    setNotificationsOpen(false);
+    navigate(`/discussions/${notification.discussionId}`);
+  };
+
+  const renderNotificationTime = (createdAt: string | null) => {
+    if (!createdAt) return "";
+    const timestamp = new Date(createdAt).getTime();
+    if (Number.isNaN(timestamp)) return "";
+    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+    if (minutes < 1) return "now";
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+  };
+
+  const renderNotificationsDropdown = () => {
+    if (!notificationsOpen || !user) return null;
+
+    return (
+      <div className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-2rem))] bg-[#1e1e1e] border border-[#2a2a2a] shadow-lg z-50">
+        <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-[#2a2a2a]">
+          <p className="text-xs font-semibold text-white">Notifications</p>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={() => markAllNotificationsRead.mutate()}
+              className="text-[11px] text-[#5b9dd9] hover:text-white transition-colors"
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {notificationsLoading && (
+            <div className="flex items-center gap-2 px-3 py-4 text-sm text-[#999999]">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading notifications...</span>
+            </div>
+          )}
+          {!notificationsLoading && notificationItems.length === 0 && (
+            <div className="px-3 py-4 text-sm text-[#999999]">No notifications yet.</div>
+          )}
+          {!notificationsLoading && notificationItems.map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              onClick={() => openNotification(notification)}
+              className={`w-full px-3 py-3 text-left border-b border-[#2a2a2a] last:border-b-0 hover:bg-[#252525] transition-colors ${
+                notification.isRead ? "bg-transparent" : "bg-[#5b9dd9]/10"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <span
+                  className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${
+                    notification.isRead ? "bg-transparent" : "bg-[#5b9dd9]"
+                  }`}
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-white leading-snug">{notification.message}</p>
+                  <p className="mt-1 text-[11px] text-[#777777]">
+                    {notification.type === "llm_reply" ? "LLM reply" : "Reply"}
+                    {notification.discussion.artistName ? ` • ${notification.discussion.artistName}` : ""}
+                    {renderNotificationTime(notification.createdAt) ? ` • ${renderNotificationTime(notification.createdAt)}` : ""}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderSearchDropdown = () => {
@@ -260,6 +422,24 @@ export default function Layout() {
             <div className="flex items-center gap-2 sm:gap-3">
               {user ? (
                 <>
+                  <div className="relative" ref={notificationMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationsOpen((open) => !open)}
+                      className="relative flex h-8 w-8 items-center justify-center rounded-sm text-[#999999] hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                      aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+                      aria-expanded={notificationsOpen}
+                    >
+                      <Bell className="h-4 w-4" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1 -top-1 min-w-4 h-4 px-1 rounded-full bg-[#5b9dd9] text-[10px] leading-4 text-white text-center font-semibold">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                    {renderNotificationsDropdown()}
+                  </div>
+
                   {/* Avatar + name */}
                   <Link
                     to="/profile"

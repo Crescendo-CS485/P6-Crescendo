@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 from app import db
 from app.models import (
     Artist, Genre, User, Discussion, Post, Album,
-    LLMJob, LLMPersona, List, ListAlbum, ListLike,
+    LLMJob, LLMPersona, Notification, List, ListAlbum, ListLike,
 )
 
 
@@ -447,6 +447,45 @@ class TestCreatePost:
         assert data["post"]["body"] == "Great song!"
         assert data["post"]["author"]["handle"] == "@sess_user"
         assert data["llmTriggered"] is False
+        assert Notification.query.count() == 0
+
+    def test_notifies_prior_human_participants(self, client, make_artist, make_user, make_discussion, make_post):
+        a = make_artist(name="NotifyPostArt")
+        owner = make_user(display_name="Thread Owner", handle="@thread_owner")
+        responder = make_user(display_name="Responder", handle="@responder")
+        d = make_discussion(a.id, owner.id, title="Notification thread")
+        make_post(d.id, owner.id, body="Opening thought")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = responder.id
+
+        r = client.post(f"/api/discussions/{d.id}/posts", json={"body": "I have a reply"})
+
+        assert r.status_code == 201
+        notifications = Notification.query.all()
+        assert len(notifications) == 1
+        assert notifications[0].user_id == owner.id
+        assert notifications[0].actor_user_id == responder.id
+        assert notifications[0].notification_type == "reply"
+        assert notifications[0].discussion_id == d.id
+
+    def test_does_not_notify_bots_or_self(self, client, make_artist, make_user, make_discussion, make_post):
+        a = make_artist(name="SelfNotifyArt")
+        human = make_user(handle="@self_notify_user")
+        bot = make_user(display_name="Seed Bot", handle="@self_notify_bot", is_bot=True)
+        d = make_discussion(a.id, human.id, title="Self notification thread")
+        make_post(d.id, human.id, body="My own thought")
+        make_post(d.id, bot.id, body="Bot thought")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = human.id
+
+        r = client.post(f"/api/discussions/{d.id}/posts", json={"body": "Another thought"})
+
+        assert r.status_code == 201
+        assert Notification.query.count() == 0
 
     def test_triggers_llm_when_requested(self, client, make_artist, make_user, make_discussion):
         a = make_artist(name="PostLlmArt")
@@ -527,6 +566,169 @@ class TestCreatePost:
         client.post(f"/api/discussions/{d.id}/posts", json={"body": "Test"})
         db.session.expire(d)
         assert Discussion.query.get(d.id).post_count == 6
+
+
+class TestNotifications:
+    def test_get_notifications_requires_auth(self, client):
+        r = client.get("/api/notifications")
+        assert r.status_code == 401
+
+    def test_get_notifications_returns_unread_count(self, client, make_artist, make_user, make_discussion, make_post):
+        artist = make_artist(name="NotificationListArtist")
+        owner = make_user(display_name="Notify Owner", handle="@notify_owner")
+        responder = make_user(display_name="Notify Responder", handle="@notify_responder")
+        discussion = make_discussion(artist.id, owner.id, title="Unread count thread")
+        opening_post = make_post(discussion.id, owner.id, body="Opening")
+        reply_post = make_post(discussion.id, responder.id, body="Reply")
+        notification = Notification(
+            user_id=owner.id,
+            actor_user_id=responder.id,
+            discussion_id=discussion.id,
+            post_id=reply_post.id,
+            notification_type="reply",
+        )
+        read_notification = Notification(
+            user_id=owner.id,
+            actor_user_id=responder.id,
+            discussion_id=discussion.id,
+            post_id=opening_post.id,
+            notification_type="reply",
+            is_read=True,
+        )
+        db.session.add_all([notification, read_notification])
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = owner.id
+
+        r = client.get("/api/notifications")
+
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["unreadCount"] == 1
+        assert len(data["notifications"]) == 2
+        assert data["notifications"][0]["message"] == "Notify Responder replied in Unread count thread"
+        assert data["notifications"][0]["discussionId"] == str(discussion.id)
+
+    def test_mark_notification_read(self, client, make_artist, make_user, make_discussion, make_post):
+        artist = make_artist(name="MarkReadArtist")
+        owner = make_user(handle="@mark_read_owner")
+        responder = make_user(handle="@mark_read_responder")
+        discussion = make_discussion(artist.id, owner.id)
+        post = make_post(discussion.id, responder.id)
+        notification = Notification(
+            user_id=owner.id,
+            actor_user_id=responder.id,
+            discussion_id=discussion.id,
+            post_id=post.id,
+            notification_type="reply",
+        )
+        db.session.add(notification)
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = owner.id
+
+        r = client.post(f"/api/notifications/{notification.id}/read")
+
+        assert r.status_code == 200
+        db.session.refresh(notification)
+        assert notification.is_read is True
+
+    def test_mark_all_notifications_read(self, client, make_artist, make_user, make_discussion, make_post):
+        artist = make_artist(name="MarkAllReadArtist")
+        owner = make_user(handle="@mark_all_owner")
+        other_owner = make_user(handle="@mark_all_other_owner")
+        responder = make_user(handle="@mark_all_responder")
+        discussion = make_discussion(artist.id, owner.id)
+        post = make_post(discussion.id, responder.id)
+        db.session.add_all([
+            Notification(
+                user_id=owner.id,
+                actor_user_id=responder.id,
+                discussion_id=discussion.id,
+                post_id=post.id,
+                notification_type="reply",
+            ),
+            Notification(
+                user_id=owner.id,
+                actor_user_id=responder.id,
+                discussion_id=discussion.id,
+                post_id=post.id,
+                notification_type="reply",
+            ),
+            Notification(
+                user_id=other_owner.id,
+                actor_user_id=responder.id,
+                discussion_id=discussion.id,
+                post_id=post.id,
+                notification_type="reply",
+            ),
+        ])
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = owner.id
+
+        r = client.post("/api/notifications/read-all")
+
+        assert r.status_code == 200
+        assert r.get_json()["updated"] == 2
+        assert Notification.query.filter_by(user_id=owner.id, is_read=False).count() == 0
+        assert Notification.query.filter_by(user_id=other_owner.id, is_read=False).count() == 1
+
+
+class TestMyDiscussions:
+    def test_requires_authentication(self, client):
+        r = client.get("/api/me/discussions")
+        assert r.status_code == 401
+
+    def test_returns_authored_and_participated_discussions(
+        self, client, make_artist, make_user, make_discussion, make_post
+    ):
+        artist = make_artist(name="ProfileDiscussionArtist")
+        user = make_user(display_name="Profile User", handle="@profile_user")
+        other = make_user(display_name="Other User", handle="@profile_other")
+        authored = make_discussion(
+            artist.id,
+            user.id,
+            title="Authored thread",
+            last_activity_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        )
+        participated = make_discussion(
+            artist.id,
+            other.id,
+            title="Participated thread",
+            last_activity_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        )
+        unrelated = make_discussion(
+            artist.id,
+            other.id,
+            title="Unrelated thread",
+            last_activity_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
+        )
+        make_post(authored.id, user.id, body="Opening")
+        make_post(participated.id, other.id, body="Opening")
+        make_post(participated.id, user.id, body="I joined")
+        make_post(unrelated.id, other.id, body="Other only")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = user.id
+
+        r = client.get("/api/me/discussions")
+
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["total"] == 2
+        assert [d["title"] for d in data["discussions"]] == [
+            "Participated thread",
+            "Authored thread",
+        ]
+        by_title = {d["title"]: d for d in data["discussions"]}
+        assert by_title["Authored thread"]["isAuthor"] is True
+        assert by_title["Participated thread"]["isAuthor"] is False
+        assert "Unrelated thread" not in by_title
 
 
 # ── GET /api/discussions/<id>/posts ────────────────────────────────────
@@ -1164,12 +1366,14 @@ class TestEdgeCases:
         assert LLMJob.query.filter_by(artist_id=a.id).count() == 0
 
     def test_run_due_llm_jobs_executes_due_pending_jobs(
-        self, client, make_artist, make_user, make_discussion, make_persona
+        self, client, make_artist, make_user, make_discussion, make_persona, make_post
     ):
         artist = make_artist(name="DueJobArtist")
+        human = make_user(display_name="Due Human", handle="@duehuman")
         bot = make_user(display_name="DueBot", handle="@duebot", is_bot=True)
         make_persona(bot.id)
-        discussion = make_discussion(artist.id, bot.id, title="Due job thread")
+        discussion = make_discussion(artist.id, human.id, title="Due job thread")
+        make_post(discussion.id, human.id, body="Human opening post")
         due_job = LLMJob(
             artist_id=artist.id,
             discussion_id=discussion.id,
@@ -1206,6 +1410,13 @@ class TestEdgeCases:
             discussion_id=discussion.id,
             body="Scheduled bot reply",
         ).count() == 1
+        notification = Notification.query.filter_by(
+            user_id=human.id,
+            notification_type="llm_reply",
+        ).first()
+        assert notification is not None
+        assert notification.actor_user_id == bot.id
+        assert notification.discussion_id == discussion.id
 
     def test_albums_time_range_today(self, client, make_artist, make_album):
         a = make_artist(name="TodayAlbumArtist")

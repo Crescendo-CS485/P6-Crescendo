@@ -1,17 +1,27 @@
 import { useCallback, useState } from "react";
-import { User, Mail, AtSign, LogOut, ListMusic, Heart, Plus } from "lucide-react";
+import { User, Mail, AtSign, LogOut, ListMusic, Heart, Plus, MessageSquare } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "../components/PageStates";
 import { API_BASE, apiFetch } from "../../lib/api";
-import type { UserList } from "../data/mockData";
+import type { Discussion, UserList } from "../data/mockData";
 import { AddArtistModal } from "../components/AddArtistModal";
 import { CreateAlbumModal } from "../components/CreateAlbumModal";
 
 interface ListsResponse {
   lists: UserList[];
+  total: number;
+}
+
+interface ProfileDiscussion extends Discussion {
+  artistName: string | null;
+  isAuthor: boolean;
+}
+
+interface DiscussionsResponse {
+  discussions: ProfileDiscussion[];
   total: number;
 }
 
@@ -56,6 +66,22 @@ export default function ProfilePage() {
       }),
     enabled: Boolean(user),
     staleTime: 60_000,
+  });
+
+  const {
+    data: discussionsData,
+    isLoading: discussionsLoading,
+    isError: discussionsError,
+    refetch: refetchDiscussions,
+  } = useQuery<DiscussionsResponse>({
+    queryKey: ["my-discussions", user?.id ?? "__none__"],
+    queryFn: () =>
+      apiFetch(`${API_BASE}/api/me/discussions?per_page=10`).then((r) => {
+        if (!r.ok) throw new Error("Failed to load discussions");
+        return r.json();
+      }),
+    enabled: Boolean(user),
+    staleTime: 30_000,
   });
 
   const onArtistCreated = useCallback(() => {
@@ -103,6 +129,7 @@ export default function ProfilePage() {
 
   const allLists = listsData?.lists ?? [];
   const yourLists = allLists.filter((l) => l.creatorUserId === user.id);
+  const yourDiscussions = discussionsData?.discussions ?? [];
   const totalLikes = yourLists.reduce((s, l) => s + (l.likes ?? 0), 0);
   const totalAlbums = yourLists.reduce((s, l) => s + (l.albumCount ?? 0), 0);
 
@@ -264,6 +291,63 @@ export default function ProfilePage() {
         )}
       </section>
 
+      <section className="bg-[#252525] border border-[#333333] p-6 mt-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-white">Your Discussions</h3>
+            <p className="text-xs text-[#999999]">Threads you started or joined.</p>
+          </div>
+          <Button asChild className="bg-[#252525] border border-[#333333] text-white hover:bg-[#1a1a1a] rounded-sm">
+            <Link to="/community">Community</Link>
+          </Button>
+        </div>
+
+        {discussionsError && (
+          <ErrorState title="Couldn't load discussions" onRetry={() => refetchDiscussions()} />
+        )}
+
+        {discussionsLoading && (
+          <div className="py-10">
+            <LoadingState message="Loading your discussions..." />
+          </div>
+        )}
+
+        {!discussionsLoading && !discussionsError && yourDiscussions.length === 0 && (
+          <EmptyState
+            title="No discussions yet"
+            message="Join a discussion or start a new artist thread to see it here."
+            actionLabel="Browse artists"
+            onAction={() => navigate("/")}
+          />
+        )}
+
+        {!discussionsLoading && !discussionsError && yourDiscussions.length > 0 && (
+          <div className="divide-y divide-[#333333] border border-[#333333] bg-[#1a1a1a]">
+            {yourDiscussions.map((discussion) => (
+              <Link
+                key={discussion.id}
+                to={`/discussions/${discussion.id}`}
+                className="flex items-start gap-3 p-4 hover:bg-[#222222] transition-colors"
+              >
+                <MessageSquare className="w-4 h-4 text-[#5b9dd9] flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-bold text-white line-clamp-1">{discussion.title}</p>
+                    <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-[#666666]">
+                      {discussion.isAuthor ? "Started" : "Joined"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#999999] line-clamp-1">
+                    {discussion.artistName ?? "Unknown artist"} • {discussion.postCount}{" "}
+                    {discussion.postCount === 1 ? "comment" : "comments"}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
       <AddArtistModal
         isOpen={addArtistOpen}
         onClose={() => setAddArtistOpen(false)}
@@ -277,4 +361,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

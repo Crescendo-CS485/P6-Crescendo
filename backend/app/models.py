@@ -160,6 +160,51 @@ class Post(db.Model):
         }
 
 
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    discussion_id = db.Column(db.Integer, db.ForeignKey("discussion.id"), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    notification_type = db.Column(db.String(50), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", foreign_keys=[user_id], backref="notifications")
+    discussion = db.relationship("Discussion", backref="notifications")
+    post = db.relationship("Post", backref="notifications")
+    actor = db.relationship("User", foreign_keys=[actor_user_id])
+
+    def to_dict(self):
+        actor_name = self.actor.display_name if self.actor else "Someone"
+        discussion_title = self.discussion.title if self.discussion else "a discussion"
+        if self.notification_type == "llm_reply":
+            message = f"{actor_name} replied with an LLM response in {discussion_title}"
+        else:
+            message = f"{actor_name} replied in {discussion_title}"
+
+        return {
+            "id": str(self.id),
+            "type": self.notification_type,
+            "message": message,
+            "isRead": bool(self.is_read),
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "discussionId": str(self.discussion_id),
+            "postId": str(self.post_id),
+            "actor": self.actor.to_dict() if self.actor else None,
+            "discussion": {
+                "id": str(self.discussion.id) if self.discussion else str(self.discussion_id),
+                "title": discussion_title,
+                "artistId": str(self.discussion.artist_id) if self.discussion else None,
+                "artistName": (
+                    self.discussion.artist.name
+                    if self.discussion and self.discussion.artist
+                    else None
+                ),
+            },
+        }
+
+
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(500), nullable=False)

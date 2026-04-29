@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -34,6 +34,7 @@ function renderProfile() {
       <MemoryRouter initialEntries={["/profile"]}>
         <Routes>
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/lists/:id" element={<div>Created list detail</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -44,7 +45,19 @@ describe("ProfilePage discussions", () => {
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
-    fetchMock = jest.fn((url: string) => {
+    fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (url === "/api/lists" && init?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            list: {
+              id: "new-list",
+              title: "Profile Picks",
+              description: "Albums from the profile page",
+            },
+          }),
+        });
+      }
       if (url === "/api/lists") {
         return Promise.resolve({ ok: true, json: async () => ({ lists: [], total: 0 }) });
       }
@@ -107,5 +120,34 @@ describe("ProfilePage discussions", () => {
 
     expect(screen.getByText("Joined")).toBeInTheDocument();
     expect(screen.getByText("Started")).toBeInTheDocument();
+  });
+
+  test("creates a list from the profile page", async () => {
+    renderProfile();
+
+    fireEvent.click(await screen.findByRole("button", { name: /create list/i }));
+    fireEvent.change(screen.getByPlaceholderText(/my favourite jazz albums/i), {
+      target: { value: "Profile Picks" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/what's this list about/i), {
+      target: { value: "Albums from the profile page" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: /create list/i }).at(-1)!);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/lists",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            title: "Profile Picks",
+            description: "Albums from the profile page",
+            createdBy: "Profile User",
+          }),
+          credentials: "include",
+        }),
+      );
+      expect(screen.getByText("Created list detail")).toBeInTheDocument();
+    });
   });
 });

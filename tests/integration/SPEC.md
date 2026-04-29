@@ -52,6 +52,7 @@ UI state management:
 | Genre card navigation | Click genre card on `/genres`; calls `GET /api/albums?genre=<name>&sort=user_score&per_page=50` without leaving the page. | Genres page updates in place to show the filtered album list for the selected genre. |
 | Lists index load | Open Lists page; calls `GET /api/lists`. | All user-created album lists are rendered. |
 | Create new list | Logged in; `POST /api/lists` with `{ title, description }`. | New list appears in the index immediately. |
+| Create list from profile | Open Profile while signed in and click `Create List`; submit title and description. | `POST /api/lists` succeeds and the UI navigates to the new list detail page. |
 | Add album to list | Open Add modal; `POST /api/lists/<id>/albums` with `{ albumId }`. | Selected album appears in the list detail view. |
 | Remove album from list | Click remove; `DELETE /api/lists/<id>/albums/<album_id>`. | Album is removed from the list detail view. |
 | Search (valid) | Type 2+ chars; `GET /api/search?q=<query>` (debounced). | Dropdown displays matching artists and albums. |

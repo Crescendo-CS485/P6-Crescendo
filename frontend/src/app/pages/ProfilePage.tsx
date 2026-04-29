@@ -9,6 +9,7 @@ import { API_BASE, apiFetch } from "../../lib/api";
 import type { Discussion, UserList } from "../data/mockData";
 import { AddArtistModal } from "../components/AddArtistModal";
 import { CreateAlbumModal } from "../components/CreateAlbumModal";
+import { CreateListModal } from "../components/CreateListModal";
 
 interface ListsResponse {
   lists: UserList[];
@@ -40,6 +41,7 @@ export default function ProfilePage() {
   const queryClient = useQueryClient();
   const [addArtistOpen, setAddArtistOpen] = useState(false);
   const [addAlbumOpen, setAddAlbumOpen] = useState(false);
+  const [createListOpen, setCreateListOpen] = useState(false);
 
   const {
     data: listsData,
@@ -96,6 +98,12 @@ export default function ProfilePage() {
     void queryClient.invalidateQueries({ queryKey: ["album-genres"] });
     void queryClient.invalidateQueries({ queryKey: ["albums-picker"] });
   }, [queryClient]);
+
+  const onListCreated = useCallback((listId: string) => {
+    setCreateListOpen(false);
+    void queryClient.invalidateQueries({ queryKey: ["lists"] });
+    navigate(`/lists/${listId}`);
+  }, [navigate, queryClient]);
 
   if (isLoading) {
     return <LoadingState message="Loading your profile..." />;
@@ -242,8 +250,12 @@ export default function ProfilePage() {
             <h3 className="text-sm font-bold text-white">Your Lists</h3>
             <p className="text-xs text-[#999999]">Lists you’ve created in this environment.</p>
           </div>
-          <Button asChild className="bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm">
-            <Link to="/lists">Browse all</Link>
+          <Button
+            onClick={() => setCreateListOpen(true)}
+            className="bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create List
           </Button>
         </div>
 
@@ -259,8 +271,8 @@ export default function ProfilePage() {
           <EmptyState
             title="No lists yet"
             message="Create your first list to start curating albums."
-            actionLabel="Go to Lists"
-            onAction={() => navigate("/lists")}
+            actionLabel="Create List"
+            onAction={() => setCreateListOpen(true)}
           />
         )}
 
@@ -357,6 +369,11 @@ export default function ProfilePage() {
         isOpen={addAlbumOpen}
         onClose={() => setAddAlbumOpen(false)}
         onCreated={onAlbumCreated}
+      />
+      <CreateListModal
+        isOpen={createListOpen}
+        onClose={() => setCreateListOpen(false)}
+        onCreated={onListCreated}
       />
     </div>
   );

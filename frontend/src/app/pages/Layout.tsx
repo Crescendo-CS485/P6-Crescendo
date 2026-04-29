@@ -22,6 +22,7 @@ export default function Layout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [completedSearchQuery, setCompletedSearchQuery] = useState("");
   const latestSearchQueryRef = useRef(searchQuery);
   latestSearchQueryRef.current = searchQuery;
 
@@ -31,6 +32,7 @@ export default function Layout() {
       setSearchResults(null);
       setSearchLoading(false);
       setSearchError(false);
+      setCompletedSearchQuery("");
       return;
     }
     const ac = new AbortController();
@@ -46,6 +48,7 @@ export default function Layout() {
           if (latestSearchQueryRef.current.trim() !== qAtFire) return;
           setSearchResults(data);
           setSearchError(false);
+          setCompletedSearchQuery(qAtFire);
         })
         .catch((err: unknown) => {
           if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") {
@@ -54,6 +57,7 @@ export default function Layout() {
           if (latestSearchQueryRef.current.trim() !== qAtFire) return;
           setSearchResults(null);
           setSearchError(true);
+          setCompletedSearchQuery(qAtFire);
         })
         .finally(() => {
           if (latestSearchQueryRef.current.trim() === qAtFire) {
@@ -85,6 +89,7 @@ export default function Layout() {
     setSearchOpen(false);
     setSearchResults(null);
     setSearchError(false);
+    setCompletedSearchQuery("");
   };
 
   const openSearchResult = (result: Artist | Album) => {
@@ -110,22 +115,24 @@ export default function Layout() {
     const artists = searchResults?.artists ?? [];
     const albums = searchResults?.albums ?? [];
     const hasResults = artists.length > 0 || albums.length > 0;
+    const currentSearchComplete = completedSearchQuery === trimmed;
+    const isWaitingForCurrentSearch = searchLoading || !currentSearchComplete;
 
     return (
       <div className="absolute top-full mt-1 left-0 right-0 bg-[#1e1e1e] border border-[#2a2a2a] z-50 shadow-lg max-h-80 overflow-y-auto">
-        {searchLoading && (
+        {isWaitingForCurrentSearch && (
           <div className="flex items-center gap-2 px-3 py-3 text-sm text-[#999999]">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Searching...</span>
           </div>
         )}
-        {!searchLoading && searchError && (
+        {!isWaitingForCurrentSearch && searchError && (
           <div className="px-3 py-3 text-sm text-[#999999]">Search is unavailable.</div>
         )}
-        {!searchLoading && !searchError && !hasResults && (
+        {!isWaitingForCurrentSearch && !searchError && !hasResults && (
           <div className="px-3 py-3 text-sm text-[#999999]">No matches found.</div>
         )}
-        {!searchLoading && !searchError && artists.length > 0 && (
+        {!isWaitingForCurrentSearch && !searchError && artists.length > 0 && (
           <div>
             <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Artists</p>
             {artists.map((a) => (
@@ -146,7 +153,7 @@ export default function Layout() {
             ))}
           </div>
         )}
-        {!searchLoading && !searchError && albums.length > 0 && (
+        {!isWaitingForCurrentSearch && !searchError && albums.length > 0 && (
           <div>
             <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Albums</p>
             {albums.map((a) => (

@@ -1201,6 +1201,48 @@ class TestListLike:
         assert data["liked"] is False
         assert data["likeCount"] == 0
 
+    def test_list_endpoints_report_real_like_rows(self, client, make_user, make_artist, make_album):
+        owner = make_user(handle="@real_list_owner")
+        viewer = make_user(handle="@real_list_viewer")
+        other_liker = make_user(handle="@real_list_liker")
+        artist = make_artist(name="RealListArtist")
+        album_one = make_album(title="RealListAlbumOne", artist_id=artist.id)
+        album_two = make_album(title="RealListAlbumTwo", artist_id=artist.id)
+        db.session.flush()
+
+        lst = List(
+            title="Real Counters",
+            creator_user_id=owner.id,
+            like_count=99,
+        )
+        db.session.add(lst)
+        db.session.flush()
+        db.session.add_all([
+            ListAlbum(list_id=lst.id, album_id=album_one.id),
+            ListAlbum(list_id=lst.id, album_id=album_two.id),
+            ListLike(list_id=lst.id, user_id=viewer.id),
+            ListLike(list_id=lst.id, user_id=other_liker.id),
+        ])
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = viewer.id
+
+        resp = client.get("/api/lists")
+        assert resp.status_code == 200
+        list_item = next(item for item in resp.get_json()["lists"] if item["id"] == str(lst.id))
+        assert list_item["likes"] == 2
+        assert list_item["albumCount"] == 2
+        assert list_item["userHasLiked"] is True
+
+        detail = client.get(f"/api/lists/{lst.id}")
+        assert detail.status_code == 200
+        detail_item = detail.get_json()["list"]
+        assert detail_item["likes"] == 2
+        assert detail_item["albumCount"] == 2
+        assert len(detail_item["albums"]) == 2
+        assert detail_item["userHasLiked"] is True
+
 
 class TestListFork:
     """Tests for POST /api/lists/:id/fork"""

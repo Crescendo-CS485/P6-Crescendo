@@ -2,7 +2,7 @@ import os
 import random
 from datetime import datetime, timezone, date, timedelta
 from . import db
-from .models import Artist, Genre, User, LLMPersona, Discussion, Post, Album, List, ListAlbum
+from .models import Artist, Genre, User, LLMPersona, Discussion, Post, Album, List, ListAlbum, ListLike
 
 ARTISTS_DATA = [
     {
@@ -1324,7 +1324,7 @@ def _seed_lists():
                 "spanning political fury, introspective beauty, and genre-defying experimentation."
             ),
             "creator": creator_map["MusicEnthusiast"],
-            "like_count": 312,
+            "likers": ["GenreHistorian", "CriticalEar", "NewListener"],
             "filter": {"genre": "Hip Hop", "limit": 6},
         },
         {
@@ -1334,7 +1334,7 @@ def _seed_lists():
                 "electronic music can achieve. A journey through synthesizers, samples, and studio craft."
             ),
             "creator": creator_map["GenreHistorian"],
-            "like_count": 187,
+            "likers": ["MusicEnthusiast", "CriticalEar", "NewListener"],
             "filter": {"genre": "Electronic", "limit": 8},
         },
         {
@@ -1344,7 +1344,7 @@ def _seed_lists():
                 "that have mattered most over the past decade."
             ),
             "creator": creator_map["CriticalEar"],
-            "like_count": 143,
+            "likers": ["MusicEnthusiast", "GenreHistorian", "NewListener"],
             "filter": {"genre": "Indie", "limit": 8},
         },
     ]
@@ -1354,7 +1354,7 @@ def _seed_lists():
             title=ldata["title"],
             description=ldata["description"],
             creator_user_id=ldata["creator"].id if ldata["creator"] else None,
-            like_count=ldata["like_count"],
+            like_count=0,
         )
         db.session.add(lst)
         db.session.flush()
@@ -1369,6 +1369,14 @@ def _seed_lists():
         for album in query.limit(f.get("limit", 10)).all():
             la = ListAlbum(list_id=lst.id, album_id=album.id)
             db.session.add(la)
+
+        for liker_name in ldata["likers"]:
+            liker = User.query.filter_by(display_name=liker_name).first()
+            if liker:
+                db.session.add(ListLike(list_id=lst.id, user_id=liker.id))
+
+        db.session.flush()
+        lst.like_count = ListLike.query.filter_by(list_id=lst.id).count()
 
     db.session.commit()
     print("Seeded 3 lists.")

@@ -7,32 +7,70 @@ from . import db
 list_bp = Blueprint("lists", __name__, url_prefix="/api/lists")
 
 
-def _with_liked(lst_dict, list_id, user_id):
-    liked = bool(
-        ListLike.query.filter_by(list_id=list_id, user_id=user_id).first()
-    ) if user_id else False
-    lst_dict["userHasLiked"] = liked
-    return lst_dict
+def _count_by_list(model, list_ids):
+    if not list_ids:
+        return {}
+    return {
+        list_id: int(count or 0)
+        for list_id, count in (
+            db.session.query(model.list_id, func.count(model.id))
+            .filter(model.list_id.in_(list_ids))
+            .group_by(model.list_id)
+            .all()
+        )
+    }
+
+
+def _liked_ids_for_user(user_id):
+    if not user_id:
+        return set()
+    return {
+        ll.list_id
+        for ll in ListLike.query.filter_by(user_id=user_id).all()
+    }
+
+
+def _serialize_list(
+    lst,
+    *,
+    include_albums=False,
+    user_id=None,
+    liked_ids=None,
+    like_counts=None,
+    album_counts=None,
+):
+    list_id = lst.id
+    if liked_ids is None:
+        liked_ids = _liked_ids_for_user(user_id)
+    if like_counts is None:
+        like_counts = _count_by_list(ListLike, [list_id])
+    if album_counts is None:
+        album_counts = _count_by_list(ListAlbum, [list_id])
+
+    data = lst.to_dict(include_albums=include_albums)
+    data["likes"] = like_counts.get(list_id, 0)
+    data["albumCount"] = album_counts.get(list_id, 0)
+    data["userHasLiked"] = list_id in liked_ids
+    return data
 
 
 @list_bp.route("", methods=["GET"])
 def get_lists():
     user_id = session.get("user_id")
     lists = List.query.order_by(List.id).all()
-
-    if user_id:
-        liked_ids = {
-            ll.list_id
-            for ll in ListLike.query.filter_by(user_id=user_id).all()
-        }
-    else:
-        liked_ids = set()
+    list_ids = [lst.id for lst in lists]
+    liked_ids = _liked_ids_for_user(user_id)
+    like_counts = _count_by_list(ListLike, list_ids)
+    album_counts = _count_by_list(ListAlbum, list_ids)
 
     result = []
-    for l in lists:
-        d = l.to_dict()
-        d["userHasLiked"] = l.id in liked_ids
-        result.append(d)
+    for lst in lists:
+        result.append(_serialize_list(
+            lst,
+            liked_ids=liked_ids,
+            like_counts=like_counts,
+            album_counts=album_counts,
+        ))
 
     return jsonify({"lists": result, "total": len(lists)})
 
@@ -42,9 +80,11 @@ def get_list(list_id):
     lst = List.query.get(list_id)
     if not lst:
         return jsonify({"error": "List not found"}), 404
-    d = lst.to_dict(include_albums=True)
-    _with_liked(d, list_id, session.get("user_id"))
-    return jsonify({"list": d})
+    return jsonify({"list": _serialize_list(
+        lst,
+        include_albums=True,
+        user_id=session.get("user_id"),
+    )})
 
 
 @list_bp.route("", methods=["POST"])
@@ -68,7 +108,7 @@ def create_list():
     )
     db.session.add(lst)
     db.session.commit()
-    return jsonify({"list": _with_liked(lst.to_dict(), lst.id, creator_user_id)}), 201
+    return jsonify({"list": _serialize_list(lst, user_id=creator_user_id)}), 201
 
 
 @list_bp.route("/<int:list_id>/albums", methods=["POST"])
@@ -99,7 +139,12 @@ def add_album(list_id):
         db.session.add(la)
         db.session.commit()
 
-    return jsonify({"list": _with_liked(lst.to_dict(include_albums=True), list_id, uid)}), 200
+    db.session.expire(lst, ["list_albums"])
+    return jsonify({"list": _serialize_list(
+        lst,
+        include_albums=True,
+        user_id=uid,
+    )}), 200
 
 
 @list_bp.route("/<int:list_id>/like", methods=["POST"])
@@ -173,7 +218,7 @@ def fork_list(list_id):
         db.session.add(ListAlbum(list_id=fork.id, album_id=la.album_id))
 
     db.session.commit()
-    return jsonify({"list": _with_liked(fork.to_dict(), fork.id, user_id)}), 201
+    return jsonify({"list": _serialize_list(fork, user_id=user_id)}), 201
 
 
 @list_bp.route("/<int:list_id>/albums/<int:album_id>", methods=["DELETE"])
@@ -194,4 +239,9 @@ def remove_album(list_id, album_id):
         db.session.delete(la)
         db.session.commit()
 
-    return jsonify({"list": _with_liked(lst.to_dict(include_albums=True), list_id, uid)}), 200
+    db.session.expire(lst, ["list_albums"])
+    return jsonify({"list": _serialize_list(
+        lst,
+        include_albums=True,
+        user_id=uid,
+    )}), 200

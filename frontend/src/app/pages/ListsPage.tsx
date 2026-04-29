@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Heart, Music, Plus, Loader2, LayoutGrid, List as ListIcon } from "lucide-react";
 import { API_BASE, apiFetch } from "../../lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
-import { UserList } from "../data/mockData";
+import { toast } from "sonner";
+import { UserList, UserListDetail } from "../data/mockData";
 import { CreateListModal } from "../components/CreateListModal";
 import { useAuth } from "../context/AuthContext";
 
@@ -14,7 +15,44 @@ interface ListsResponse {
   total: number;
 }
 
-function ListRow({ list }: { list: UserList }) {
+interface ListDetailResponse {
+  list: UserListDetail;
+}
+
+interface ListItemProps {
+  list: UserList;
+  isLikePending: boolean;
+  onToggleLike: (list: UserList) => void;
+}
+
+function LikeButton({
+  list,
+  isLikePending,
+  onToggleLike,
+}: ListItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggleLike(list)}
+      disabled={isLikePending}
+      aria-pressed={list.userHasLiked}
+      aria-label={
+        list.userHasLiked
+          ? `Unsave ${list.title}, ${list.likes} likes`
+          : `Save ${list.title}, ${list.likes} likes`
+      }
+      title={list.userHasLiked ? "Saved" : "Save"}
+      className={`flex items-center gap-1 transition-colors disabled:opacity-60 ${
+        list.userHasLiked ? "text-red-400" : "text-[#666666] hover:text-red-400"
+      }`}
+    >
+      <Heart className={`w-3.5 h-3.5 ${list.userHasLiked ? "fill-current" : ""}`} aria-hidden="true" />
+      <span>{list.likes}</span>
+    </button>
+  );
+}
+
+function ListRow({ list, isLikePending, onToggleLike }: ListItemProps) {
   return (
     <div className="flex items-center gap-4 bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-3">
       <div className="flex-1 min-w-0">
@@ -29,9 +67,8 @@ function ListRow({ list }: { list: UserList }) {
           <Music className="w-3 h-3" />
           <span>{list.albumCount}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-1">
-          <Heart className="w-3 h-3" />
-          <span>{list.likes}</span>
+        <div className="hidden sm:flex">
+          <LikeButton list={list} isLikePending={isLikePending} onToggleLike={onToggleLike} />
         </div>
         <Link
           to={`/lists/${list.id}`}
@@ -45,7 +82,7 @@ function ListRow({ list }: { list: UserList }) {
 }
 
 
-function ListCard({ list }: { list: UserList }) {
+function ListCard({ list, isLikePending, onToggleLike }: ListItemProps) {
   return (
     <div className="bg-[#252525] border border-[#333333] hover:border-[#5b9dd9] transition-colors p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -53,9 +90,8 @@ function ListCard({ list }: { list: UserList }) {
           <h3 className="text-base font-bold text-white mb-1 line-clamp-1">{list.title}</h3>
           <p className="text-xs text-[#5b9dd9]">by {list.createdBy}</p>
         </div>
-        <div className="flex-shrink-0 flex items-center gap-1 text-xs text-[#666666]">
-          <Heart className="w-3.5 h-3.5" />
-          <span>{list.likes}</span>
+        <div className="flex-shrink-0 text-xs">
+          <LikeButton list={list} isLikePending={isLikePending} onToggleLike={onToggleLike} />
         </div>
       </div>
 
@@ -84,8 +120,10 @@ function ListCard({ list }: { list: UserList }) {
 export default function ListsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [pendingLikeId, setPendingLikeId] = useState<string | null>(null);
 
   const listsQueryUser = user?.id ?? "anon";
 
@@ -113,6 +151,63 @@ export default function ListsPage() {
   function handleCreated(listId: string) {
     setShowCreateModal(false);
     navigate(`/lists/${listId}`);
+  }
+
+  function updateListLike(listId: string, liked: boolean, likeCount: number) {
+    queryClient.setQueryData<ListsResponse>(["lists", listsQueryUser], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        lists: current.lists.map((list) =>
+          list.id === listId ? { ...list, userHasLiked: liked, likes: likeCount } : list
+        ),
+      };
+    });
+    queryClient.setQueryData<ListDetailResponse>(["list", listId, listsQueryUser], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        list: { ...current.list, userHasLiked: liked, likes: likeCount },
+      };
+    });
+  }
+
+  async function handleToggleLike(list: UserList) {
+    if (!user) {
+      toast.error("Sign in to save lists.");
+      return;
+    }
+    if (pendingLikeId) return;
+
+    const previousLiked = list.userHasLiked;
+    const previousCount = list.likes;
+    const nextLiked = !previousLiked;
+    const nextCount = nextLiked ? previousCount + 1 : Math.max(0, previousCount - 1);
+
+    setPendingLikeId(list.id);
+    updateListLike(list.id, nextLiked, nextCount);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/lists/${list.id}/like`, { method: "POST" });
+      if (!res.ok) {
+        let message = `Could not save this list (${res.status})`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          /* non-JSON error body */
+        }
+        toast.error(message);
+        updateListLike(list.id, previousLiked, previousCount);
+        return;
+      }
+      const result = (await res.json()) as { liked: boolean; likeCount: number };
+      updateListLike(list.id, result.liked, result.likeCount);
+    } catch {
+      toast.error("Network error — could not reach the server");
+      updateListLike(list.id, previousLiked, previousCount);
+    } finally {
+      setPendingLikeId(null);
+    }
   }
 
   return (
@@ -184,13 +279,23 @@ export default function ListsPage() {
           {viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
               {lists.map((list) => (
-                <ListCard key={list.id} list={list} />
+                <ListCard
+                  key={list.id}
+                  list={list}
+                  isLikePending={pendingLikeId === list.id}
+                  onToggleLike={handleToggleLike}
+                />
               ))}
             </div>
           ) : (
             <div className="space-y-2 mb-10">
               {lists.map((list) => (
-                <ListRow key={list.id} list={list} />
+                <ListRow
+                  key={list.id}
+                  list={list}
+                  isLikePending={pendingLikeId === list.id}
+                  onToggleLike={handleToggleLike}
+                />
               ))}
             </div>
           )}

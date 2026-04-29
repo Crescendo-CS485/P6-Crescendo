@@ -51,10 +51,20 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submittedDisplayName = String(formData.get("displayName") ?? displayName).trim();
+    const submittedHandle = String(formData.get("handle") ?? handle).trim();
+    const submittedEmail = String(formData.get("email") ?? joinEmail).trim();
+    const submittedPassword = String(formData.get("password") ?? joinPassword);
     setError(null);
+    if (!submittedDisplayName || !submittedHandle || !submittedEmail || !submittedPassword) {
+      setError("Display name, username, email, and password are required.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await register(displayName, handle, joinEmail, joinPassword);
+      await register(submittedDisplayName, submittedHandle, submittedEmail, submittedPassword);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -65,10 +75,18 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const submittedEmail = String(formData.get("email") ?? signInEmail).trim();
+    const submittedPassword = String(formData.get("password") ?? signInPassword);
     setError(null);
+    if (!submittedEmail || !submittedPassword) {
+      setError("Email and password are required.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await login(signInEmail, signInPassword);
+      await login(submittedEmail, submittedPassword);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -145,6 +163,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                   </Label>
                   <Input
                     id="join-display-name"
+                    name="displayName"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your name"
@@ -158,6 +177,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                   </Label>
                   <Input
                     id="join-handle"
+                    name="handle"
                     value={handle}
                     onChange={(e) => setHandle(e.target.value)}
                     placeholder="@handle"
@@ -172,6 +192,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                 </Label>
                 <Input
                   id="join-email"
+                  name="email"
                   type="email"
                   value={joinEmail}
                   onChange={(e) => setJoinEmail(e.target.value)}
@@ -186,6 +207,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                 </Label>
                 <Input
                   id="join-password"
+                  name="password"
                   type="password"
                   value={joinPassword}
                   onChange={(e) => setJoinPassword(e.target.value)}
@@ -224,6 +246,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                 </Label>
                 <Input
                   id="signin-email"
+                  name="email"
                   type="email"
                   value={signInEmail}
                   onChange={(e) => setSignInEmail(e.target.value)}
@@ -238,6 +261,7 @@ export function AuthModal({ isOpen, initialTab = "join", onClose }: AuthModalPro
                 </Label>
                 <Input
                   id="signin-password"
+                  name="password"
                   type="password"
                   value={signInPassword}
                   onChange={(e) => setSignInPassword(e.target.value)}

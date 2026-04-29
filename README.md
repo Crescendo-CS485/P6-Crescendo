@@ -146,12 +146,16 @@ Configuration files (all in `frontend/`):
 
 ### Continuous Integration
 
-Both test suites run automatically on every push and pull request to `main` via GitHub Actions:
+The single GitHub Actions workflow, `.github/workflows/ci-cd.yml`, runs on every push and pull request to `main`.
+Pull requests run test jobs only. Pushes to `main` run the test jobs first, then the deployment jobs.
 
-| Workflow | File | What it does |
-|----------|------|--------------|
-| **Backend Tests** | `.github/workflows/run-backend-tests.yml` | Python 3.10, installs deps, runs pytest with coverage |
-| **Frontend Tests** | `.github/workflows/run-frontend-tests.yml` | Node 20, installs deps, runs `npm run build` (type-check + bundle), then `npm test` (Jest) |
+| Job | When | What it does |
+|-----|------|--------------|
+| **Backend Tests** | Pushes and PRs to `main` | Python 3.12, installs backend deps, runs pytest with coverage |
+| **Frontend Tests** | Pushes and PRs to `main` | Node 20, installs frontend deps, runs `npm run build`, then `npm test` |
+| **Integration Tests** | Pushes and PRs to `main` | Starts Postgres, Flask, and Vite, then runs Playwright |
+| **Deploy Backend to AWS Lambda** | Pushes to `main` only, after backend + integration tests pass | Packages `backend/` and calls `aws lambda update-function-code` for `crescendo-api` |
+| **Deploy Frontend to AWS Amplify** | Pushes to `main` only, after frontend + integration tests pass | Builds the frontend, then waits for the Amplify `main` branch job to finish |
 
 View CI results at the [Actions tab](../../actions) on GitHub.
 
@@ -568,14 +572,18 @@ P4 Crescendo/
 
 ## Deploying to AWS (Fork Setup)
 
-If you fork this repo you can run the same CD pipeline against your own AWS account. The two workflows that run on every push to `main` are:
+If you fork this repo you can run the same CI/CD pipeline against your own AWS account. The pipeline is defined in one workflow file: `.github/workflows/ci-cd.yml`.
 
-| Workflow | File | What it does |
-|----------|------|--------------|
-| **Deploy Backend to AWS Lambda** | `.github/workflows/deploy-aws-lambda.yml` | Packages the Flask app and calls `aws lambda update-function-code` |
-| **Deploy Frontend to AWS Amplify** | `.github/workflows/deploy-aws-amplify.yml` | Builds the React app and waits for Amplify's auto-triggered job to finish |
+On pull requests, the workflow runs tests only. On pushes to `main`, it runs tests and then starts two deployment jobs:
 
-The steps below are written for the **AWS Management Console**. If you prefer the command line, expand the CLI Quickstart below — it covers the same five setup steps using only the AWS CLI and GitHub CLI.
+| Job | What it does |
+|-----|--------------|
+| **Deploy Backend to AWS Lambda** | Installs backend dependencies into a package directory, copies the Flask app and Lambda handler, zips the package, and calls `aws lambda update-function-code` |
+| **Deploy Frontend to AWS Amplify** | Runs the frontend build in Actions, then waits for Amplify's auto-triggered branch deployment to finish |
+
+The current workflow targets Lambda function `crescendo-api` and Amplify app ID `d291kg32gzfrfc`. If you fork the repo, update those values in `.github/workflows/ci-cd.yml` for your AWS account.
+
+The steps below are written for the **AWS Management Console**. If you prefer the command line, expand the CLI Quickstart below — it covers the same setup and push flow using only the AWS CLI and GitHub CLI.
 
 <details>
 <summary><strong>CLI Quickstart — AWS CLI + GitHub CLI alternative</strong></summary>
@@ -587,7 +595,7 @@ The steps below are written for the **AWS Management Console**. If you prefer th
 
 ```bash
 REGION=us-east-1
-FUNCTION_NAME=crescendo-api        # must match deploy-aws-lambda.yml
+FUNCTION_NAME=crescendo-api        # must match .github/workflows/ci-cd.yml
 REPO=YOUR_ORG/YOUR_REPO            # e.g. Crescendo-CS485/P6-Crescendo
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ```
@@ -690,7 +698,7 @@ aws lambda add-permission \
   --function-url-auth-type NONE \
   --region $REGION
 
-# Print the URL — update VITE_API_BASE_URL / vite.config.ts to point here
+# Print the URL — set the frontend VITE_API_BASE value to this URL
 aws lambda get-function-url-config \
   --function-name $FUNCTION_NAME \
   --query FunctionUrl --output text --region $REGION
@@ -716,16 +724,20 @@ aws amplify create-branch \
 
 echo "Amplify App ID: $AMPLIFY_APP_ID"
 
-# Patch the workflow file with your App ID
+# Patch the workflow file with your App ID and Lambda tag ARN
 # macOS:
 sed -i '' "s/d291kg32gzfrfc/$AMPLIFY_APP_ID/g" \
-  .github/workflows/deploy-aws-amplify.yml
+  .github/workflows/ci-cd.yml
+sed -i '' "s|arn:aws:lambda:us-east-1:940482408601:function:crescendo-api|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}|g" \
+  .github/workflows/ci-cd.yml
 # Linux:
 # sed -i "s/d291kg32gzfrfc/$AMPLIFY_APP_ID/g" \
-#   .github/workflows/deploy-aws-amplify.yml
+#   .github/workflows/ci-cd.yml
+# sed -i "s|arn:aws:lambda:us-east-1:940482408601:function:crescendo-api|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}|g" \
+#   .github/workflows/ci-cd.yml
 
-git add .github/workflows/deploy-aws-amplify.yml
-git commit -m "chore: set Amplify app ID for fork"
+git add .github/workflows/ci-cd.yml
+git commit -m "chore: set AWS deployment identifiers for fork"
 ```
 
 ---
@@ -745,7 +757,8 @@ cat > /tmp/deploy-policy.json << EOF
       "Action": [
         "lambda:UpdateFunctionCode",
         "lambda:GetFunction",
-        "lambda:GetFunctionConfiguration"
+        "lambda:GetFunctionConfiguration",
+        "lambda:TagResource"
       ],
       "Resource": "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}"
     },
@@ -754,8 +767,7 @@ cat > /tmp/deploy-policy.json << EOF
       "Effect": "Allow",
       "Action": [
         "amplify:ListJobs",
-        "amplify:GetJob",
-        "amplify:StartJob"
+        "amplify:GetJob"
       ],
       "Resource": "arn:aws:amplify:${REGION}:${ACCOUNT_ID}:apps/${AMPLIFY_APP_ID}/branches/main/jobs/*"
     }
@@ -840,7 +852,7 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
 5. Under **Configuration → Function URL**, click **Create function URL**, auth type **NONE**. Copy the URL — this is your API base URL.
 6. Update the frontend's `VITE_API_BASE` (or the Vite proxy target) to point at your function URL.
 
-> If you rename the function from `crescendo-api`, open `.github/workflows/deploy-aws-lambda.yml` and update the two `--function-name crescendo-api` references to match.
+> If you rename the function from `crescendo-api`, open `.github/workflows/ci-cd.yml` and update every `crescendo-api` reference in the `deploy-lambda` job. Also update the hard-coded Lambda ARN used by the `tag-resource` step, or remove that tagging step.
 
 ### Step 3 — Create the Amplify app (frontend)
 
@@ -848,7 +860,7 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
 2. Connect your **forked GitHub repository**, branch `main`.
 3. Amplify will detect the `amplify.yml` at the repo root and use it for the build.
 4. Complete the setup. Note your **App ID** (looks like `d2xxxxxxxxx`).
-5. Open `.github/workflows/deploy-aws-amplify.yml` and replace both occurrences of `d291kg32gzfrfc` with your App ID.
+5. Open `.github/workflows/ci-cd.yml` and replace both occurrences of `d291kg32gzfrfc` with your App ID.
 
 ### Step 4 — Create an IAM user with least-privilege access
 
@@ -866,7 +878,8 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
       "Action": [
         "lambda:UpdateFunctionCode",
         "lambda:GetFunction",
-        "lambda:GetFunctionConfiguration"
+        "lambda:GetFunctionConfiguration",
+        "lambda:TagResource"
       ],
       "Resource": "arn:aws:lambda:YOUR_REGION:YOUR_ACCOUNT_ID:function:YOUR_FUNCTION_NAME"
     },
@@ -875,8 +888,7 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
       "Effect": "Allow",
       "Action": [
         "amplify:ListJobs",
-        "amplify:GetJob",
-        "amplify:StartJob"
+        "amplify:GetJob"
       ],
       "Resource": "arn:aws:amplify:YOUR_REGION:YOUR_ACCOUNT_ID:apps/YOUR_AMPLIFY_APP_ID/branches/main/jobs/*"
     }
@@ -899,20 +911,20 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
 
 ### Step 6 — Push to main
 
-With the workflow files updated (function name, Amplify app ID) and secrets in place, push any commit to `main`:
+With `.github/workflows/ci-cd.yml` updated for your Lambda function, Lambda tag ARN, and Amplify app ID, and with secrets in place, push any commit to `main`:
 
 ```bash
 git push origin main
 ```
 
-The Actions tab will show five concurrent workflows:
+The Actions tab will show one **CI / CD** workflow with five jobs:
 
-| Workflow | Expected outcome |
-|----------|------------------|
+| Job | Expected outcome |
+|-----|------------------|
 | Backend Tests | pytest suite passes |
 | Frontend Tests | `npm run build` + Jest passes |
 | Integration Tests | Playwright E2E passes |
 | Deploy Backend to AWS Lambda | ZIP uploaded, `lambda:UpdateFunctionCode` succeeds |
 | Deploy Frontend to AWS Amplify | Amplify build job completes with status `SUCCEED` |
 
-Once both deploy workflows are green, your fork is live.
+Once both deploy jobs are green, your fork is live.

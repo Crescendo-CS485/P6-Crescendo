@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User
@@ -6,16 +8,53 @@ from . import db
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
+def _request_json() -> dict:
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        return data
+
+    raw_body = request.get_data(cache=True, as_text=True)
+    if raw_body:
+        try:
+            parsed = json.loads(raw_body)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    return request.form.to_dict()
+
+
+def _first_present(data: dict, *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if value is not None:
+            return str(value)
+    return ""
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    data = request.get_json(silent=True) or {}
-    display_name = data.get("displayName", "").strip()
-    handle = data.get("handle", "").strip()
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
+    data = _request_json()
+    display_name = _first_present(data, "displayName", "display_name", "name").strip()
+    handle = _first_present(data, "handle", "username", "userName").strip()
+    email = _first_present(data, "email").strip().lower()
+    password = _first_present(data, "password")
 
-    if not display_name or not handle or not email or not password:
-        return jsonify({"error": "All fields are required"}), 400
+    missing = []
+    if not display_name:
+        missing.append("displayName")
+    if not handle:
+        missing.append("handle")
+    if not email:
+        missing.append("email")
+    if not password:
+        missing.append("password")
+    if missing:
+        return jsonify({
+            "error": f"Missing required fields: {', '.join(missing)}",
+            "missingFields": missing,
+        }), 400
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
@@ -45,7 +84,7 @@ def register():
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    data = request.get_json(silent=True) or {}
+    data = _request_json()
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
 

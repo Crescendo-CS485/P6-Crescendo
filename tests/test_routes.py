@@ -1049,6 +1049,39 @@ class TestEdgeCases:
         })
         assert r3.status_code == 400
 
+    def test_register_accepts_raw_json_body(self, client):
+        resp = client.post(
+            "/api/auth/register",
+            data=(
+                '{"displayName":"RawJsonUser","handle":"rawjson",'
+                '"email":"rawjson@example.com","password":"password123"}'
+            ),
+        )
+        assert resp.status_code == 201
+        assert resp.get_json()["user"]["email"] == "rawjson@example.com"
+
+    def test_register_accepts_client_field_aliases(self, client):
+        resp = client.post("/api/auth/register", json={
+            "name": "Alias User",
+            "username": "aliasuser",
+            "email": "alias@example.com",
+            "password": "password123",
+        })
+
+        assert resp.status_code == 201
+        user = resp.get_json()["user"]
+        assert user["displayName"] == "Alias User"
+        assert user["handle"] == "@aliasuser"
+        assert user["email"] == "alias@example.com"
+
+    def test_register_reports_missing_fields(self, client):
+        resp = client.post("/api/auth/register", json={"email": "partial@example.com"})
+
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["error"] == "Missing required fields: displayName, handle, password"
+        assert data["missingFields"] == ["displayName", "handle", "password"]
+
     def test_stagger_scheduler_returns_zero_without_personas(self, client, make_artist):
         a = make_artist(name="NoPersonaArtist")
         db.session.commit()
@@ -1059,6 +1092,50 @@ class TestEdgeCases:
         assert count == 0
         # ensure no LLMJob rows created
         assert LLMJob.query.filter_by(artist_id=a.id).count() == 0
+
+    def test_run_due_llm_jobs_executes_due_pending_jobs(
+        self, client, make_artist, make_user, make_discussion, make_persona
+    ):
+        artist = make_artist(name="DueJobArtist")
+        bot = make_user(display_name="DueBot", handle="@duebot", is_bot=True)
+        make_persona(bot.id)
+        discussion = make_discussion(artist.id, bot.id, title="Due job thread")
+        due_job = LLMJob(
+            artist_id=artist.id,
+            discussion_id=discussion.id,
+            llm_user_id=bot.id,
+            scheduled_time=datetime.now(timezone.utc) - timedelta(minutes=1),
+            status="pending",
+        )
+        future_job = LLMJob(
+            artist_id=artist.id,
+            discussion_id=discussion.id,
+            llm_user_id=bot.id,
+            scheduled_time=datetime.now(timezone.utc) + timedelta(minutes=10),
+            status="pending",
+        )
+        db.session.add_all([due_job, future_job])
+        db.session.commit()
+
+        from app.services.llm_worker import run_due_llm_jobs
+
+        with patch(
+            "app.services.llm_service.LLMServiceAPI.generate_comment",
+            return_value="Scheduled bot reply",
+        ):
+            result = run_due_llm_jobs(limit=5)
+
+        assert result["processed"] == 1
+        assert result["completed"] == 1
+        assert result["failed"] == 0
+        db.session.refresh(due_job)
+        db.session.refresh(future_job)
+        assert due_job.status == "completed"
+        assert future_job.status == "pending"
+        assert Post.query.filter_by(
+            discussion_id=discussion.id,
+            body="Scheduled bot reply",
+        ).count() == 1
 
     def test_albums_time_range_today(self, client, make_artist, make_album):
         a = make_artist(name="TodayAlbumArtist")

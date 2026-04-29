@@ -20,4 +20,14 @@ if __import__("os").environ.get("LAMBDA_CREATE_TABLES") == "1":
         # This keeps the handler importable so Lambda can surface logs/health.
         print(f"[lambda_handler] LAMBDA_CREATE_TABLES failed: {e}")
 
-handler = Mangum(WSGIMiddleware(flask_app), lifespan="off")
+http_handler = Mangum(WSGIMiddleware(flask_app), lifespan="off")
+
+
+def handler(event, context):
+    if isinstance(event, dict) and event.get("action") == "run_due_llm_jobs":
+        from app.services.llm_worker import run_due_llm_jobs
+
+        with flask_app.app_context():
+            return run_due_llm_jobs()
+
+    return http_handler(event, context)

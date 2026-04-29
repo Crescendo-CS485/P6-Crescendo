@@ -93,14 +93,22 @@ export default function DiscoveryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
 
-  const queryParams = buildParams({
-    active_discussions: activeDiscussions || undefined,
-    genre: selectedGenres.length > 0 ? selectedGenres : undefined,
-    time_range: selectedTimeRange !== "all" ? selectedTimeRange : undefined,
-    sort,
-    page,
-    per_page: PER_PAGE,
-  });
+  const isActiveDiscussionsOnly =
+    activeDiscussions &&
+    selectedGenres.length === 0 &&
+    selectedTimeRange === "all" &&
+    sort === "activity" &&
+    page === 1;
+  const queryParams = isActiveDiscussionsOnly
+    ? "active_discussions=true"
+    : buildParams({
+        active_discussions: activeDiscussions || undefined,
+        genre: selectedGenres.length > 0 ? selectedGenres : undefined,
+        time_range: selectedTimeRange !== "all" ? selectedTimeRange : undefined,
+        sort,
+        page,
+        per_page: PER_PAGE,
+      });
 
   const { data, isLoading, isError, refetch } = useQuery<ArtistsResponse>({
     queryKey: ["artists", { activeDiscussions, selectedGenres, selectedTimeRange, sort, page }],

@@ -283,8 +283,7 @@ describe("DiscoveryPage", () => {
     fireEvent.click(screen.getByRole("switch"));
 
     await waitFor(() => {
-      expect(lastFetchUrl()).toContain("active_discussions=true");
-      expect(lastFetchUrl()).toContain("page=1");
+      expect(lastFetchUrl()).toBe("/api/artists?active_discussions=true");
     });
   });
 
@@ -318,7 +317,7 @@ describe("DiscoveryPage", () => {
     fireEvent.click(screen.getByRole("switch"));
 
     await waitFor(() =>
-      expect(lastFetchUrl()).toContain("active_discussions=true")
+      expect(lastFetchUrl()).toBe("/api/artists?active_discussions=true")
     );
   });
 

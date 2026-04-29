@@ -1,6 +1,6 @@
-import { Outlet, NavLink, Link } from "react-router";
+import { Outlet, NavLink, Link, useNavigate } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
-import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut } from "lucide-react";
+import { Music, TrendingUp, Disc, List, Radio, Users, Search, Menu, X, LogOut, Loader2 } from "lucide-react";
 import { Toaster } from "../components/ui/sonner";
 import { Input } from "../components/ui/input";
 import { useState, useEffect, useRef } from "react";
@@ -9,6 +9,7 @@ import { AuthModal } from "../components/AuthModal";
 import { Artist, Album } from "../data/mockData";
 
 export default function Layout() {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authModal, setAuthModal] = useState<{ open: boolean; tab: "join" | "signin" }>({
     open: false,
@@ -19,32 +20,45 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ artists: Artist[]; albums: Album[] } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const latestSearchQueryRef = useRef(searchQuery);
   latestSearchQueryRef.current = searchQuery;
 
   useEffect(() => {
-    if (searchQuery.length < 2) {
+    const qAtFire = searchQuery.trim();
+    if (qAtFire.length < 2) {
       setSearchResults(null);
+      setSearchLoading(false);
+      setSearchError(false);
       return;
     }
     const ac = new AbortController();
-    const qAtFire = searchQuery;
     const t = setTimeout(() => {
+      setSearchLoading(true);
+      setSearchError(false);
       apiFetch(`${API_BASE}/api/search?q=${encodeURIComponent(qAtFire)}`, { signal: ac.signal })
         .then(async (r) => {
           if (!r.ok) throw new Error("Search failed");
           return r.json();
         })
         .then((data) => {
-          if (latestSearchQueryRef.current !== qAtFire) return;
+          if (latestSearchQueryRef.current.trim() !== qAtFire) return;
           setSearchResults(data);
+          setSearchError(false);
         })
         .catch((err: unknown) => {
           if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") {
             return;
           }
-          if (latestSearchQueryRef.current !== qAtFire) return;
+          if (latestSearchQueryRef.current.trim() !== qAtFire) return;
           setSearchResults(null);
+          setSearchError(true);
+        })
+        .finally(() => {
+          if (latestSearchQueryRef.current.trim() === qAtFire) {
+            setSearchLoading(false);
+          }
         });
     }, 300);
     return () => {
@@ -64,6 +78,123 @@ export default function Layout() {
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
+  };
+
+  const closeSearch = () => {
+    setSearchQuery("");
+    setSearchOpen(false);
+    setSearchResults(null);
+    setSearchError(false);
+  };
+
+  const openSearchResult = (result: Artist | Album) => {
+    const target = "artistId" in result ? `/artists/${result.artistId}` : `/artists/${result.id}`;
+    closeSearch();
+    navigate(target);
+  };
+
+  const openFirstSearchResult = () => {
+    const firstArtist = searchResults?.artists[0];
+    const firstAlbum = searchResults?.albums[0];
+    if (firstArtist) {
+      openSearchResult(firstArtist);
+    } else if (firstAlbum) {
+      openSearchResult(firstAlbum);
+    }
+  };
+
+  const renderSearchDropdown = () => {
+    const trimmed = searchQuery.trim();
+    if (!searchOpen || trimmed.length < 2) return null;
+
+    const artists = searchResults?.artists ?? [];
+    const albums = searchResults?.albums ?? [];
+    const hasResults = artists.length > 0 || albums.length > 0;
+
+    return (
+      <div className="absolute top-full mt-1 left-0 right-0 bg-[#1e1e1e] border border-[#2a2a2a] z-50 shadow-lg max-h-80 overflow-y-auto">
+        {searchLoading && (
+          <div className="flex items-center gap-2 px-3 py-3 text-sm text-[#999999]">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Searching...</span>
+          </div>
+        )}
+        {!searchLoading && searchError && (
+          <div className="px-3 py-3 text-sm text-[#999999]">Search is unavailable.</div>
+        )}
+        {!searchLoading && !searchError && !hasResults && (
+          <div className="px-3 py-3 text-sm text-[#999999]">No matches found.</div>
+        )}
+        {!searchLoading && !searchError && artists.length > 0 && (
+          <div>
+            <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Artists</p>
+            {artists.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors text-left"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => openSearchResult(a)}
+              >
+                {a.image ? (
+                  <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                )}
+                <span className="text-sm text-white">{a.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {!searchLoading && !searchError && albums.length > 0 && (
+          <div>
+            <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Albums</p>
+            {albums.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors text-left"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => openSearchResult(a)}
+              >
+                {a.coverUrl || a.artistImage ? (
+                  <img
+                    src={a.coverUrl || a.artistImage || undefined}
+                    alt={a.title}
+                    className="w-8 h-8 object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm text-white line-clamp-1">{a.title}</p>
+                  <p className="text-xs text-[#999999] line-clamp-1">{a.artistName}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const searchInputProps = {
+    value: searchQuery,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+      setSearchOpen(true);
+    },
+    onFocus: () => setSearchOpen(true),
+    onBlur: () => setTimeout(() => setSearchOpen(false), 150),
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Escape") {
+        closeSearch();
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        openFirstSearchResult();
+      }
+    },
   };
 
   return (
@@ -109,65 +240,12 @@ export default function Layout() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666666]" />
                 <Input
                   type="search"
-                  placeholder="Search artists, albums, songs..."
+                  placeholder="Search artists and albums..."
                   aria-label="Search artists, albums, songs"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                  {...searchInputProps}
                   className="pl-10 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-[#666666] h-9 rounded-sm focus-visible:border-[#5b9dd9] focus-visible:ring-[#5b9dd9]/20"
                 />
-                {searchOpen && searchResults && (searchResults.artists.length > 0 || searchResults.albums.length > 0) && (
-                  <div className="absolute top-full mt-1 left-0 right-0 bg-[#1e1e1e] border border-[#2a2a2a] z-50 shadow-lg max-h-80 overflow-y-auto">
-                    {searchResults.artists.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Artists</p>
-                        {searchResults.artists.map((a) => (
-                          <Link
-                            key={a.id}
-                            to={`/artists/${a.id}`}
-                            className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
-                            onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                          >
-                            {a.image ? (
-                              <img src={a.image} alt={a.name} className="w-8 h-8 object-cover flex-shrink-0" />
-                            ) : (
-                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
-                            )}
-                            <span className="text-sm text-white">{a.name}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                    {searchResults.albums.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-[#666666] uppercase tracking-wide px-3 pt-2 pb-1">Albums</p>
-                        {searchResults.albums.map((a) => (
-                          <Link
-                            key={a.id}
-                            to={`/artists/${a.artistId}`}
-                            className="flex items-center gap-3 px-3 py-2 hover:bg-[#2a2a2a] transition-colors"
-                            onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                          >
-                            {a.coverUrl || a.artistImage ? (
-                              <img
-                                src={a.coverUrl || a.artistImage || undefined}
-                                alt={a.title}
-                                className="w-8 h-8 object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 bg-[#1a1a1a] border border-[#333333] flex-shrink-0" aria-hidden="true" />
-                            )}
-                            <div>
-                              <p className="text-sm text-white">{a.title}</p>
-                              <p className="text-xs text-[#999999]">{a.artistName}</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {renderSearchDropdown()}
               </div>
             </div>
 
@@ -304,10 +382,10 @@ export default function Layout() {
             type="search"
             placeholder="Search..."
             aria-label="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            {...searchInputProps}
             className="pl-10 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-[#666666] h-9 rounded-sm"
           />
+          {renderSearchDropdown()}
         </div>
       </div>
 

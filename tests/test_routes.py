@@ -838,6 +838,22 @@ class TestGetAlbums:
         assert len(data["albums"]) == 1
         assert data["albums"][0]["albumType"] == "EP"
 
+    def test_search_filter_matches_album_title_and_artist_name(self, client, make_artist, make_album):
+        title_artist = make_artist(name="Plain Artist")
+        name_artist = make_artist(name="Needle Artist")
+        make_album(title="Needle Album", artist_id=title_artist.id)
+        make_album(title="Different Title", artist_id=name_artist.id)
+        make_album(title="Other Album", artist_id=title_artist.id)
+        db.session.commit()
+
+        title_resp = client.get("/api/albums?q=needle")
+        title_data = title_resp.get_json()
+        title_names = {album["title"] for album in title_data["albums"]}
+        assert title_resp.status_code == 200
+        assert "Needle Album" in title_names
+        assert "Different Title" in title_names
+        assert "Other Album" not in title_names
+
     def test_time_range_year(self, client, make_artist, make_album):
         a = make_artist(name="YearArt")
         make_album(title="2026 Album", artist_id=a.id,

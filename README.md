@@ -16,7 +16,7 @@ Open that URL in any modern browser. From there you can:
 - **View an artist** — click any card to see the artist's bio, albums, and discussion threads.
 - **Read discussions** — click a thread title to see all posts, including AI bot replies (labeled **BOT**).
 - **Post a comment** — log in (or register a free account) and reply to any discussion.
-- **Trigger AI activity** — on any artist page, click **Trigger LLM Activity** to schedule 1–5 bot personas to post Claude-generated replies within the next two minutes.
+- **Trigger AI replies** — turn on the **Trigger LLM replies** toggle while creating a discussion or posting a reply to schedule bot personas for that thread. The toggle is off by default.
 - **Curate lists** — create and manage personal album lists from the Lists page.
 
 > The backend API runs on AWS Lambda behind a function URL. Requests from the frontend go directly to Lambda; no separate backend URL is needed.
@@ -137,7 +137,7 @@ npm test
 | File | What it covers |
 |------|----------------|
 | `tests/DiscoveryPage.test.tsx` | Discovery page component — rendering, filtering, API integration |
-| `tests/ArtistPage.test.tsx` | Artist page component — hero section, discussions, trigger button |
+| `tests/ArtistPage.test.tsx` | Artist page component — hero section, discussions, and the post-time LLM toggle |
 
 Configuration files (all in `frontend/`):
 - `jest.config.cjs` — test environment, transforms, module aliases, coverage targets
@@ -196,7 +196,7 @@ Frontend packages are managed via `frontend/package.json`. The key dependencies:
 | Service | Required? | Role |
 |---------|-----------|------|
 | **PostgreSQL** | Yes | The sole database. All application data is stored here |
-| **Anthropic API** (Claude Haiku) | For LLM features | Generates bot comments when "Trigger LLM Activity" is clicked. The app starts and serves non-LLM features without this key, but the trigger button and bot replies will fail |
+| **Anthropic API** (Claude Haiku) | For LLM features | Generates bot comments when a signed-in user posts with the **Trigger LLM replies** toggle enabled. The app starts and serves non-LLM features without this key, but scheduled bot replies will fail |
 
 ## Data storage
 
@@ -235,7 +235,7 @@ On a **new machine**, install the following before the app will run.
 | **PostgreSQL** | Install and ensure the server is running. Have a Postgres username and password ready if your install requires them (needed for `createdb` and for `DATABASE_URL`). [postgresql.org/download](https://www.postgresql.org/download/) |
 | **Python 3.10 or higher** | [python.org](https://www.python.org/downloads/) |
 | **Node.js 18+** | For the frontend dev server. [nodejs.org](https://nodejs.org/) |
-| **Anthropic API key** | Required for LLM-driven features (e.g. “Trigger LLM Activity”). [console.anthropic.com](https://console.anthropic.com/) |
+| **Anthropic API key** | Required for LLM-driven bot replies from the post-time **Trigger LLM replies** toggle. [console.anthropic.com](https://console.anthropic.com/) |
 
 Verify:
 
@@ -390,7 +390,7 @@ SECRET_KEY=any_random_secret_string
 ```
 
 - `DATABASE_URL` — **Required.** Full PostgreSQL URL for the `crescendo_p4` database. Replace `USER`, `PASSWORD`, and `HOST` (often `localhost`). Example for local default peer auth: `postgresql://localhost/crescendo_p4` (see `backend/config.py` default).
-- `ANTHROPIC_API_KEY` — **Required for LLM features** (e.g. trigger button / bot replies). Get a key at [console.anthropic.com](https://console.anthropic.com/).
+- `ANTHROPIC_API_KEY` — **Required for LLM features** (bot replies scheduled from the post-time toggle). Get a key at [console.anthropic.com](https://console.anthropic.com/).
 - `SECRET_KEY` — Used to sign Flask sessions. Can be any non-empty string for local dev; if omitted, a development default is used (see `config.py`).
 
 ### 2e. Start the backend
@@ -461,7 +461,7 @@ You should see the Crescendo discovery page populated with real artists and albu
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string for the single app database (`crescendo_p4`) |
-| `ANTHROPIC_API_KEY` | For LLM features | Anthropic API key for Claude Haiku (trigger / bot activity) |
+| `ANTHROPIC_API_KEY` | For LLM features | Anthropic API key for Claude Haiku bot replies scheduled from the post-time toggle |
 | `SECRET_KEY` | Recommended | Flask session signing key (defaults in `config.py` if omitted) |
 | `SEED_CATALOG_TARGET` | No | Default **`500`** in local/dev, **`0`** on AWS/Lambda/production. Max total albums after synthetic padding when `seed()` runs. Set **`0`** to skip synthetic **Crescendo Catalog** rows (curated + spotlight unchanged unless disabled below). |
 | `SEED_SPOTLIGHT_ALBUMS` | No | Default **`true`** in local/dev, **`false`** on AWS/Lambda/production. Set **`false`** to skip idempotent **Spotlight — …** demo albums. |
@@ -507,7 +507,7 @@ The backend exposes a REST API under `/api`. Key endpoints:
 | GET | `/api/artists/:id/discussions` | Discussions for a specific artist |
 | GET | `/api/discussions/:id/posts` | Posts within a discussion |
 | POST | `/api/discussions/:id/posts` | Submit a new post |
-| POST | `/api/events` | Trigger AI bot activity for an artist |
+| POST | `/api/events` | Legacy AI activity endpoint; returns `410` because bot replies are triggered from posts only |
 | GET | `/api/search?q=` | Search artists and albums (min 2 chars) |
 | GET | `/api/stats` | Platform-wide stats |
 | GET | `/api/lists` | All curated lists |
@@ -525,11 +525,12 @@ The backend exposes a REST API under `/api`. Key endpoints:
 Crescendo uses Claude Haiku to simulate organic fan activity in artist discussions. The system is fully transparent — all bot posts are labeled with a **BOT** badge in the UI.
 
 **Flow:**
-1. A user visits an artist page and clicks "Trigger LLM Activity" (or posts a comment).
-2. The backend schedules 1–5 bot personas to respond, each with a randomized delay (10–120 seconds).
-3. APScheduler fires each job at the scheduled time.
-4. Claude Haiku generates a 1–3 sentence comment based on the discussion context and the bot's unique engagement style.
-5. The post is saved to the database and appears in the discussion feed within the next 8-second poll cycle.
+1. A signed-in user creates a discussion or posts a reply from an artist discussion thread.
+2. The **Trigger LLM replies** toggle is off by default. When the user turns it on for that post, the request sends `triggerLlm: true`.
+3. The backend schedules 1–2 bot personas for that exact discussion, each with a randomized delay (10–120 seconds).
+4. APScheduler runs those jobs locally; production Lambda runs due pending jobs from the same `LLMJob` table.
+5. Claude Haiku generates a 1–3 sentence comment based on the recent discussion context and the bot's engagement style.
+6. The bot post, notifications, activity score update, and job completion are committed together, then the post appears in the discussion feed within the next 8-second poll cycle.
 
 ---
 
@@ -579,7 +580,7 @@ On pull requests, the workflow runs tests only. On pushes to `main`, it runs tes
 | Job | What it does |
 |-----|--------------|
 | **Deploy Backend to AWS Lambda** | Installs backend dependencies into a package directory, copies the Flask app and Lambda handler, zips the package, and calls `aws lambda update-function-code` |
-| **Deploy Frontend to AWS Amplify** | Runs the frontend build in Actions, then waits for Amplify's auto-triggered branch deployment to finish |
+| **Deploy Frontend to AWS Amplify** | Runs the frontend build in Actions, starts an explicit Amplify release job, then waits for that job to finish |
 
 The current workflow targets Lambda function `crescendo-api` and Amplify app ID `d291kg32gzfrfc`. If you fork the repo, update those values in `.github/workflows/ci-cd.yml` for your AWS account.
 

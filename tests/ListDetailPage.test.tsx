@@ -243,4 +243,112 @@ describe("ListDetailPage", () => {
     });
     expect(mockNavigate).not.toHaveBeenCalled();
   });
+
+  test("add album modal loads additional album pages from the API", async () => {
+    const firstPageAlbum = makeAlbum({ id: "20", title: "First Page Album" });
+    const secondPageAlbum = makeAlbum({ id: "21", title: "Second Page Album" });
+
+    fetchMock.mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/lists/1")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            list: makeList({
+              creatorUserId: "2",
+              albums: [makeAlbum({ id: "99", title: "Existing Album" })],
+              albumCount: 1,
+            }),
+          }),
+        });
+      }
+
+      if (typeof url === "string" && url.includes("/api/albums")) {
+        const parsed = new URL(url, "http://localhost");
+        const page = parsed.searchParams.get("page");
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            albums: page === "2" ? [secondPageAlbum] : [firstPageAlbum],
+            total: 2,
+            page: Number(page ?? "1"),
+            pages: 2,
+          }),
+        });
+      }
+
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+
+    renderPage();
+    await waitFor(() => screen.getByRole("button", { name: "Add Albums" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Albums" }));
+
+    expect(await screen.findByText("First Page Album")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/albums?per_page=25"),
+        expect.any(Object)
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+
+    expect(await screen.findByText("Second Page Album")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("page=2"),
+        expect.any(Object)
+      );
+    });
+  });
+
+  test("add album modal sends search terms to the album endpoint", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/lists/1")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            list: makeList({
+              creatorUserId: "2",
+              albums: [makeAlbum({ id: "99", title: "Existing Album" })],
+              albumCount: 1,
+            }),
+          }),
+        });
+      }
+
+      if (typeof url === "string" && url.includes("/api/albums")) {
+        const parsed = new URL(url, "http://localhost");
+        const query = parsed.searchParams.get("q");
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            albums: query === "late" ? [makeAlbum({ id: "30", title: "Late Catalog Find" })] : [],
+            total: query === "late" ? 1 : 0,
+            page: 1,
+            pages: 1,
+          }),
+        });
+      }
+
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+
+    renderPage();
+    await waitFor(() => screen.getByRole("button", { name: "Add Albums" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Albums" }));
+    fireEvent.change(await screen.findByPlaceholderText("Search albums or artists..."), {
+      target: { value: "late" },
+    });
+
+    expect(await screen.findByText("Late Catalog Find")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("q=late"),
+        expect.any(Object)
+      );
+    });
+  });
 });

@@ -495,6 +495,14 @@ def get_albums():
     if album_type:
         query = query.filter(Album.album_type == album_type)
 
+    # Filter: search album title or artist name
+    search_query = request.args.get("q", "").strip()
+    if search_query:
+        pattern = f"%{search_query}%"
+        query = query.outerjoin(Artist).filter(
+            or_(Album.title.ilike(pattern), Artist.name.ilike(pattern))
+        )
+
     # Filter: time_range
     time_range = request.args.get("time_range", "all-time")
     today = date.today()

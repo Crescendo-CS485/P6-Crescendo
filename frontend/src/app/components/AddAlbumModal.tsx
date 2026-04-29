@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { X, Search, Plus, Check, Loader2 } from "lucide-react";
 import { API_BASE, apiFetch } from "../../lib/api";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Album } from "../data/mockData";
 
 interface AlbumsResponse {
   albums: Album[];
+  total: number;
+  page: number;
+  pages: number;
 }
 
 interface AddAlbumModalProps {
@@ -25,6 +28,7 @@ export function AddAlbumModal({
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set(existingAlbumIds));
+  const searchTerm = search.trim();
 
   // Reset state when modal opens
   useEffect(() => {
@@ -42,26 +46,40 @@ export function AddAlbumModal({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<AlbumsResponse>({
-    queryKey: ["albums-picker"],
-    queryFn: () =>
-      apiFetch(`${API_BASE}/api/albums?per_page=100&sort=user_score`).then((r) => {
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<AlbumsResponse>({
+    queryKey: ["albums-picker", searchTerm],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({
+        per_page: "25",
+        sort: "user_score",
+        page: String(pageParam),
+      });
+      if (searchTerm) params.set("q", searchTerm);
+
+      return apiFetch(`${API_BASE}/api/albums?${params}`).then((r) => {
         if (!r.ok) throw new Error("Failed to load albums");
         return r.json();
-      }),
+      });
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined,
     enabled: isOpen,
     staleTime: 60_000,
   });
 
-  const albums = data?.albums ?? [];
-
-  const filtered = search.trim()
-    ? albums.filter(
-        (a) =>
-          a.title.toLowerCase().includes(search.toLowerCase()) ||
-          a.artistName.toLowerCase().includes(search.toLowerCase())
-      )
-    : albums;
+  const albums = data?.pages.flatMap((page) => page.albums) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   async function handleAdd(albumId: string) {
     setAdding(albumId);
@@ -111,7 +129,7 @@ export function AddAlbumModal({
 
         {/* Album list */}
         <div className="overflow-y-auto flex-1 px-6 py-3 space-y-1">
-          {(isLoading || isFetching) && (
+          {(isLoading || (isFetching && !isFetchingNextPage && albums.length === 0)) && (
             <div className="flex items-center justify-center py-12 text-[#666666]">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               <span className="text-sm">Loading albums...</span>
@@ -133,11 +151,11 @@ export function AddAlbumModal({
             </div>
           )}
 
-          {!isLoading && !isFetching && !isError && filtered.length === 0 && (
+          {!isLoading && !isFetching && !isError && albums.length === 0 && (
             <p className="text-center text-sm text-[#666666] py-10">No albums found.</p>
           )}
 
-          {!isError && filtered.map((album) => {
+          {!isError && albums.map((album) => {
             const isAdded = added.has(album.id);
             const isAddingThis = adding === album.id;
 
@@ -192,6 +210,26 @@ export function AddAlbumModal({
               </div>
             );
           })}
+
+          {!isError && albums.length > 0 && (
+            <div className="pt-3 pb-1 flex justify-center">
+              {hasNextPage ? (
+                <button
+                  type="button"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-sm bg-[#252525] hover:bg-[#303030] text-[#cccccc] border border-[#333333] rounded-sm transition-colors disabled:opacity-60"
+                >
+                  {isFetchingNextPage && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Load more
+                </button>
+              ) : (
+                <p className="text-xs text-[#666666]">
+                  Showing {albums.length} of {total}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

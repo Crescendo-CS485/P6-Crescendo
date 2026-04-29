@@ -385,6 +385,72 @@ class TestGetArtistDiscussions:
 
 # ── POST /api/discussions/<id>/posts ───────────────────────────────────
 
+class TestCreateArtistDiscussion:
+    """Tests for POST /api/artists/<id>/discussions"""
+
+    def test_creates_discussion_with_opening_post(self, client, make_artist, make_user):
+        artist = make_artist(name="Thread Artist")
+        user = make_user(display_name="Thread Starter", handle="@threadstarter")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = user.id
+
+        resp = client.post(
+            f"/api/artists/{artist.id}/discussions",
+            json={
+                "title": "Best album opener?",
+                "body": "I keep coming back to the first track.",
+            },
+        )
+
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["discussion"]["title"] == "Best album opener?"
+        assert data["discussion"]["postCount"] == 1
+        assert data["post"]["body"] == "I keep coming back to the first track."
+        assert data["post"]["author"]["handle"] == "@threadstarter"
+
+        discussion = Discussion.query.get(int(data["discussion"]["id"]))
+        assert discussion.artist_id == artist.id
+        assert discussion.author_user_id == user.id
+        assert discussion.post_count == 1
+        assert Post.query.filter_by(discussion_id=discussion.id).count() == 1
+
+    def test_requires_authentication(self, client, make_artist):
+        artist = make_artist(name="No Auth Thread")
+        db.session.commit()
+
+        resp = client.post(
+            f"/api/artists/{artist.id}/discussions",
+            json={"title": "Topic", "body": "Body"},
+        )
+
+        assert resp.status_code == 401
+
+    def test_requires_title_and_body(self, client, make_artist, make_user):
+        artist = make_artist(name="Invalid Thread")
+        user = make_user(handle="@invalidthread")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = user.id
+
+        missing_title = client.post(
+            f"/api/artists/{artist.id}/discussions",
+            json={"body": "Body"},
+        )
+        missing_body = client.post(
+            f"/api/artists/{artist.id}/discussions",
+            json={"title": "Topic"},
+        )
+
+        assert missing_title.status_code == 400
+        assert missing_title.get_json()["error"] == "Title is required"
+        assert missing_body.status_code == 400
+        assert missing_body.get_json()["error"] == "Body is required"
+
+
 class TestCreatePost:
     """Spec tests 21-26"""
 

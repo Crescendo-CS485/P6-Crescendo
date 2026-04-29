@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, Zap, Loader2, Music } from "lucide-react";
+import { ArrowLeft, MessageSquare, Zap, Loader2, Music, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Artist, Discussion } from "../data/mockData";
 import { Button } from "../components/ui/button";
+import { AuthModal } from "../components/AuthModal";
 
 interface ArtistResponse {
   artist: Artist;
@@ -29,8 +30,14 @@ export function formatTime(isoString: string): string {
 
 export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [triggering, setTriggering] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [discussionTitle, setDiscussionTitle] = useState("");
+  const [discussionBody, setDiscussionBody] = useState("");
+  const [creatingDiscussion, setCreatingDiscussion] = useState(false);
+  const [discussionError, setDiscussionError] = useState<string | null>(null);
 
   const { data: artistData, isLoading: artistLoading } = useQuery<ArtistResponse>({
     queryKey: ["artist", id],
@@ -82,6 +89,45 @@ export default function ArtistPage() {
       toast.error("Network error — could not reach the server");
     } finally {
       setTriggering(false);
+    }
+  }
+
+  async function handleCreateDiscussion(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    const title = discussionTitle.trim();
+    const body = discussionBody.trim();
+    if (!title || !body) {
+      setDiscussionError("Title and opening comment are required.");
+      return;
+    }
+
+    setCreatingDiscussion(true);
+    setDiscussionError(null);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/artists/${id}/discussions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to start discussion");
+      }
+      setDiscussionTitle("");
+      setDiscussionBody("");
+      await refetchDiscussions();
+      toast.success("Discussion started");
+      navigate(`/discussions/${data.discussion.id}`);
+    } catch (err) {
+      setDiscussionError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setCreatingDiscussion(false);
     }
   }
 
@@ -183,10 +229,83 @@ export default function ArtistPage() {
 
           {/* Discussions */}
           <div>
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-[#5b9dd9]" />
-              Discussions
-            </h2>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-[#5b9dd9]" />
+                Discussions
+              </h2>
+              {!user && (
+                <Button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-8 px-3 text-xs"
+                >
+                  Sign In to Post
+                </Button>
+              )}
+            </div>
+
+            {user ? (
+              <form onSubmit={handleCreateDiscussion} className="mb-6 border border-[#2a2a2a] bg-[#252525]">
+                <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-[#2a2a2a]">
+                  <div className="w-6 h-6 rounded-sm bg-[#5b9dd9] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {user.displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs text-white font-medium">{user.displayName}</span>
+                  <span className="text-xs text-[#555555]">{user.handle}</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  <input
+                    value={discussionTitle}
+                    onChange={(e) => setDiscussionTitle(e.target.value)}
+                    placeholder={`Start a discussion about ${artist.name}`}
+                    aria-label="Discussion title"
+                    maxLength={500}
+                    className="w-full bg-[#1a1a1a] border border-[#333333] text-sm text-white placeholder:text-[#888888] px-3 py-2 rounded-sm outline-none focus:border-[#5b9dd9]"
+                  />
+                  <textarea
+                    value={discussionBody}
+                    onChange={(e) => setDiscussionBody(e.target.value)}
+                    placeholder="Add the opening comment..."
+                    aria-label="Opening comment"
+                    rows={4}
+                    className="w-full bg-[#1a1a1a] border border-[#333333] text-sm text-white placeholder:text-[#888888] px-3 py-2 rounded-sm resize-none outline-none focus:border-[#5b9dd9]"
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    {discussionError ? (
+                      <p role="alert" className="text-xs text-red-400">{discussionError}</p>
+                    ) : (
+                      <p className="text-xs text-[#888888]">
+                        Start a public thread for this artist or one of their albums.
+                      </p>
+                    )}
+                    <Button
+                      type="submit"
+                      disabled={creatingDiscussion || !discussionTitle.trim() || !discussionBody.trim()}
+                      className="bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-8 px-4 text-xs font-medium disabled:opacity-40 flex items-center gap-1.5"
+                      size="sm"
+                    >
+                      {creatingDiscussion ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <><Send className="w-3.5 h-3.5" />Post Discussion</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className="mb-6 border border-[#2a2a2a] bg-[#252525] p-4 text-center">
+                <p className="text-sm text-[#999999] mb-3">
+                  Sign in to start a discussion about this artist or album.
+                </p>
+                <Button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="bg-[#5b9dd9] hover:bg-[#4a8bc2] text-white rounded-sm h-8 px-4 text-sm"
+                >
+                  Sign In
+                </Button>
+              </div>
+            )}
 
             {discLoading && (
               <div role="status" aria-live="polite" className="flex items-center gap-2 text-[#666666] py-4">
@@ -226,6 +345,12 @@ export default function ArtistPage() {
           </div>
         </>
       )}
+
+      <AuthModal
+        isOpen={authModalOpen}
+        initialTab="signin"
+        onClose={() => setAuthModalOpen(false)}
+      />
 
     </div>
   );

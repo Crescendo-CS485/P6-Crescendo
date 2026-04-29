@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from flask import Blueprint, request, jsonify, session, current_app
 from sqlalchemy import nullslast, func, desc
 from .models import Artist, Genre, Discussion, Post, LLMJob, Album, User, album_genres
@@ -239,9 +239,73 @@ def get_artist_discussions(artist_id):
     })
 
 
+@bp.route("/artists/<int:artist_id>/discussions", methods=["POST"])
+def create_artist_discussion(artist_id):
+    artist = Artist.query.get(artist_id)
+    if not artist:
+        return jsonify({"error": "Artist not found"}), 404
+
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
+    author = User.query.get(user_id)
+    if not author:
+        session.pop("user_id", None)
+        return jsonify({"error": "Invalid session"}), 401
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip()
+
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    if not body:
+        return jsonify({"error": "Body is required"}), 400
+
+    now = datetime.now(timezone.utc)
+    discussion = Discussion(
+        artist_id=artist_id,
+        author_user_id=author.id,
+        title=title,
+        post_count=1,
+        last_activity_at=now,
+    )
+    db.session.add(discussion)
+    db.session.flush()
+
+    post = Post(
+        discussion_id=discussion.id,
+        author_user_id=author.id,
+        body=body,
+    )
+    db.session.add(post)
+
+    artist.discussion_count = (
+        db.session.query(func.count(Discussion.id))
+        .filter(Discussion.artist_id == artist_id)
+        .scalar()
+        or 0
+    )
+    artist.latest_thread_title = title
+    artist.latest_thread_timestamp = now.isoformat()
+
+    db.session.commit()
+
+    from .services.trigger_handler import TriggerHandlerService
+    TriggerHandlerService().handle_user_reply(
+        artist_id=artist_id,
+        discussion_id=discussion.id,
+    )
+
+    return jsonify({
+        "discussion": discussion.to_dict(),
+        "post": post.to_dict(),
+    }), 201
+
+
 @bp.route("/discussions/<int:discussion_id>/posts", methods=["POST"])
 def create_post(discussion_id):
-    from datetime import datetime, timezone
     from .models import User
 
     discussion = Discussion.query.get(discussion_id)

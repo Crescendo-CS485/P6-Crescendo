@@ -766,10 +766,14 @@ cat > /tmp/deploy-policy.json << EOF
       "Sid": "AmplifyDeploy",
       "Effect": "Allow",
       "Action": [
+        "amplify:StartJob",
         "amplify:ListJobs",
         "amplify:GetJob"
       ],
-      "Resource": "arn:aws:amplify:${REGION}:${ACCOUNT_ID}:apps/${AMPLIFY_APP_ID}/branches/main/jobs/*"
+      "Resource": [
+        "arn:aws:amplify:${REGION}:${ACCOUNT_ID}:apps/${AMPLIFY_APP_ID}/branches/main",
+        "arn:aws:amplify:${REGION}:${ACCOUNT_ID}:apps/${AMPLIFY_APP_ID}/branches/main/jobs/*"
+      ]
     }
   ]
 }
@@ -860,7 +864,8 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
 2. Connect your **forked GitHub repository**, branch `main`.
 3. Amplify will detect the `amplify.yml` at the repo root and use it for the build.
 4. Complete the setup. Note your **App ID** (looks like `d2xxxxxxxxx`).
-5. Open `.github/workflows/ci-cd.yml` and replace both occurrences of `d291kg32gzfrfc` with your App ID.
+5. Open `.github/workflows/ci-cd.yml` and replace the `AMPLIFY_APP_ID` value with your App ID.
+6. If Amplify auto-build is disabled, keep it disabled and let GitHub Actions start each release job explicitly with `aws amplify start-job`. This avoids relying on Amplify to independently detect pushes.
 
 ### Step 4 — Create an IAM user with least-privilege access
 
@@ -887,10 +892,14 @@ Tables and seed data are **not** created by Lambda cold start alone. Use **`pyth
       "Sid": "AmplifyDeploy",
       "Effect": "Allow",
       "Action": [
+        "amplify:StartJob",
         "amplify:ListJobs",
         "amplify:GetJob"
       ],
-      "Resource": "arn:aws:amplify:YOUR_REGION:YOUR_ACCOUNT_ID:apps/YOUR_AMPLIFY_APP_ID/branches/main/jobs/*"
+      "Resource": [
+        "arn:aws:amplify:YOUR_REGION:YOUR_ACCOUNT_ID:apps/YOUR_AMPLIFY_APP_ID/branches/main",
+        "arn:aws:amplify:YOUR_REGION:YOUR_ACCOUNT_ID:apps/YOUR_AMPLIFY_APP_ID/branches/main/jobs/*"
+      ]
     }
   ]
 }

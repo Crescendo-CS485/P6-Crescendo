@@ -256,6 +256,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [frontend-tests, integration-tests]
     runs-on: ubuntu-latest
+    env:
+      AMPLIFY_APP_ID: d291kg32gzfrfc
+      AMPLIFY_BRANCH: main
     steps:
       - uses: actions/checkout@v4
 
@@ -278,30 +281,33 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Get latest Amplify job ID
+      - name: Start Amplify deployment
         id: amplify_job
         run: |
-          echo "Waiting for Amplify to pick up the push..."
-          sleep 15
-          JOB_ID=$(aws amplify list-jobs \
-            --app-id d291kg32gzfrfc \
-            --branch-name main \
-            --max-results 1 \
-            --query "jobSummaries[0].jobId" \
+          JOB_ID=$(aws amplify start-job \
+            --app-id "$AMPLIFY_APP_ID" \
+            --branch-name "$AMPLIFY_BRANCH" \
+            --job-type RELEASE \
+            --job-reason "GitHub Actions deploy ${GITHUB_SHA}" \
+            --query "jobSummary.jobId" \
             --output text)
+
+          if [ -z "$JOB_ID" ] || [ "$JOB_ID" = "None" ]; then
+            echo "Amplify did not return a deployment job ID."
+            exit 1
+          fi
+
           echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
-          echo "Tracking Amplify job: $JOB_ID"
+          echo "Started Amplify job: $JOB_ID"
 
       - name: Wait for Amplify deployment to complete
         run: |
-          APP_ID="d291kg32gzfrfc"
-          BRANCH="main"
           JOB_ID="${{ steps.amplify_job.outputs.job_id }}"
 
           for i in $(seq 1 40); do
             STATUS=$(aws amplify get-job \
-              --app-id "$APP_ID" \
-              --branch-name "$BRANCH" \
+              --app-id "$AMPLIFY_APP_ID" \
+              --branch-name "$AMPLIFY_BRANCH" \
               --job-id "$JOB_ID" \
               --query "job.summary.status" \
               --output text)

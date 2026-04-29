@@ -15,7 +15,7 @@ export function CommentBox({ discussionId, onSignInClick }: CommentBoxProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
-  const [triggerLlm, setTriggerLlm] = useState(true);
+  const [triggerLlm, setTriggerLlm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

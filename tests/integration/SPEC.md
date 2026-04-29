@@ -29,7 +29,7 @@ UI state management:
 | Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
 | Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
 | Community stats panel | Open Community page; calls `GET /api/stats` (alongside discussions fetch). | Sidebar displays Active Artists and Community Members from the stats response. |
-| Trigger LLM replies from a post | While signed in, start a discussion or submit a comment with the `Trigger LLM replies` toggle enabled; request body includes `triggerLlm: true`. | Status 201; the post is created and backend schedules LLM replies for that discussion. Turning the toggle off sends `triggerLlm: false` and creates only the user post. |
+| Trigger LLM replies from a post | While signed in, start a discussion or submit a comment; the `Trigger LLM replies` toggle is off by default and sends `triggerLlm: false`. Turning it on sends `triggerLlm: true`. | Status 201; the post is created. When enabled, the backend schedules LLM replies for that discussion; when left off, it creates only the user post. |
 | Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
 | Load discussion list | Artist page mount; calls `GET /api/artists/<id>/discussions`. | List of discussion threads renders beneath the profile. |
 | Open thread and load posts | Click discussion card; calls `GET /api/discussions/<id>/posts`. | Post bodies render in chronological order. |

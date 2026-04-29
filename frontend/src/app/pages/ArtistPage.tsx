@@ -36,7 +36,7 @@ export default function ArtistPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [discussionTitle, setDiscussionTitle] = useState("");
   const [discussionBody, setDiscussionBody] = useState("");
-  const [triggerLlm, setTriggerLlm] = useState(true);
+  const [triggerLlm, setTriggerLlm] = useState(false);
   const [creatingDiscussion, setCreatingDiscussion] = useState(false);
   const [discussionError, setDiscussionError] = useState<string | null>(null);
 

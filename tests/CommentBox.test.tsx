@@ -40,7 +40,7 @@ describe("CommentBox", () => {
     global.fetch = fetchMock;
   });
 
-  test("posts comments with LLM replies enabled by default", async () => {
+  test("posts comments with LLM replies disabled by default", async () => {
     renderCommentBox();
 
     fireEvent.change(screen.getByLabelText("Your comment"), {
@@ -53,19 +53,19 @@ describe("CommentBox", () => {
         "/api/discussions/d1/posts",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ body: "Great thread", triggerLlm: true }),
+          body: JSON.stringify({ body: "Great thread", triggerLlm: false }),
           credentials: "include",
         }),
       );
     });
   });
 
-  test("posts comments without LLM replies when the toggle is off", async () => {
+  test("posts comments with LLM replies when the toggle is on", async () => {
     renderCommentBox();
 
     fireEvent.click(screen.getByRole("switch", { name: /trigger llm replies/i }));
     fireEvent.change(screen.getByLabelText("Your comment"), {
-      target: { value: "No bot replies" },
+      target: { value: "Invite bot replies" },
     });
     fireEvent.click(screen.getByRole("button", { name: /post/i }));
 
@@ -74,7 +74,7 @@ describe("CommentBox", () => {
         "/api/discussions/d1/posts",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ body: "No bot replies", triggerLlm: false }),
+          body: JSON.stringify({ body: "Invite bot replies", triggerLlm: true }),
           credentials: "include",
         }),
       );

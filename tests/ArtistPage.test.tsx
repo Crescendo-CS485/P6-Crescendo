@@ -509,7 +509,7 @@ describe("create discussion form", () => {
     });
   }
 
-  test("posts title, body, and enabled LLM toggle by default", async () => {
+  test("posts title, body, and disabled LLM toggle by default", async () => {
     mockPageAndCreateDiscussion();
     await loadAndFillForm();
 
@@ -523,7 +523,7 @@ describe("create discussion form", () => {
           body: JSON.stringify({
             title: "New thread",
             body: "Opening comment",
-            triggerLlm: true,
+            triggerLlm: false,
           }),
           credentials: "include",
         }),
@@ -531,7 +531,7 @@ describe("create discussion form", () => {
     });
   });
 
-  test("sends triggerLlm false when the toggle is off", async () => {
+  test("sends triggerLlm true when the toggle is on", async () => {
     mockPageAndCreateDiscussion();
     await loadAndFillForm();
 
@@ -546,7 +546,7 @@ describe("create discussion form", () => {
           body: JSON.stringify({
             title: "New thread",
             body: "Opening comment",
-            triggerLlm: false,
+            triggerLlm: true,
           }),
           credentials: "include",
         }),

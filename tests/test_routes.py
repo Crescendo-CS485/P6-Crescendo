@@ -259,31 +259,21 @@ def _register_session(client):
 
 
 class TestPostEvent:
-    """Spec tests 14-17"""
+    """Legacy page-activation endpoint is disabled; LLM replies are post-triggered."""
 
-    def test_successful_trigger(self, client, make_artist, make_user, make_persona):
+    def test_event_trigger_is_disabled(self, client, make_artist):
         _register_session(client)
-        a = make_artist(name="TrigArt")
-        # Need at least 3 personas (StaggerScheduler picks randint(3, min(5, N)))
-        bot1 = make_user(display_name="Bot1", handle="@trigbot1", is_bot=True)
-        bot2 = make_user(display_name="Bot2", handle="@trigbot2", is_bot=True)
-        bot3 = make_user(display_name="Bot3", handle="@trigbot3", is_bot=True)
-        make_persona(bot1.id)
-        make_persona(bot2.id, name="Bot2")
-        make_persona(bot3.id, name="Bot3")
-        disc = Discussion(
-            artist_id=a.id, author_user_id=bot1.id,
-            title="Trigger disc", post_count=0,
-        )
-        db.session.add(disc)
+        artist = make_artist(name="Legacy Trigger Artist")
         db.session.commit()
+
         r = client.post("/api/events", json={
             "eventType": "page_activation",
-            "artistId": a.id,
+            "artistId": artist.id,
         })
-        assert r.status_code == 200
-        data = r.get_json()
-        assert data["job_count"] >= 1
+
+        assert r.status_code == 410
+        assert "posts only" in r.get_json()["error"]
+        assert LLMJob.query.count() == 0
 
     def test_missing_artist_id(self, client):
         _register_session(client)
@@ -291,52 +281,8 @@ class TestPostEvent:
         assert r.status_code == 400
         assert "artistId" in r.get_json()["error"]
 
-    def test_nonexistent_artist(self, client):
-        _register_session(client)
-        r = client.post("/api/events", json={
-            "eventType": "page_activation",
-            "artistId": 9999,
-        })
-        assert r.status_code == 404
-
-    def test_dedup_within_60s(self, client, make_artist, make_user, make_persona):
-        _register_session(client)
-        a = make_artist(name="DedupArt")
-        bot1 = make_user(display_name="DBot1", handle="@dedupbot1", is_bot=True)
-        bot2 = make_user(display_name="DBot2", handle="@dedupbot2", is_bot=True)
-        bot3 = make_user(display_name="DBot3", handle="@dedupbot3", is_bot=True)
-        make_persona(bot1.id)
-        make_persona(bot2.id, name="DBot2")
-        make_persona(bot3.id, name="DBot3")
-        disc = Discussion(
-            artist_id=a.id, author_user_id=bot1.id,
-            title="Dedup disc", post_count=0,
-        )
-        db.session.add(disc)
-        db.session.commit()
-        # First call
-        client.post("/api/events", json={
-            "eventType": "page_activation", "artistId": a.id,
-        })
-        # Second call — should be deduped
-        r2 = client.post("/api/events", json={
-            "eventType": "page_activation", "artistId": a.id,
-        })
-        assert r2.get_json()["job_count"] == 0
-
-    def test_events_require_auth(self, client, make_artist, make_user, make_persona):
+    def test_events_require_auth(self, client, make_artist):
         a = make_artist(name="NoAuthTrig")
-        bot1 = make_user(display_name="NA1", handle="@nabot1", is_bot=True)
-        bot2 = make_user(display_name="NA2", handle="@nabot2", is_bot=True)
-        bot3 = make_user(display_name="NA3", handle="@nabot3", is_bot=True)
-        make_persona(bot1.id)
-        make_persona(bot2.id, name="NA2")
-        make_persona(bot3.id, name="NA3")
-        disc = Discussion(
-            artist_id=a.id, author_user_id=bot1.id,
-            title="NA disc", post_count=0,
-        )
-        db.session.add(disc)
         db.session.commit()
         r = client.post("/api/events", json={
             "eventType": "page_activation",
@@ -396,26 +342,60 @@ class TestCreateArtistDiscussion:
         with client.session_transaction() as sess:
             sess["user_id"] = user.id
 
-        resp = client.post(
-            f"/api/artists/{artist.id}/discussions",
-            json={
-                "title": "Best album opener?",
-                "body": "I keep coming back to the first track.",
-            },
-        )
+        with patch(
+            "app.services.trigger_handler.TriggerHandlerService.handle_user_reply",
+            return_value={"job_count": 1},
+        ) as trigger:
+            resp = client.post(
+                f"/api/artists/{artist.id}/discussions",
+                json={
+                    "title": "Best album opener?",
+                    "body": "I keep coming back to the first track.",
+                },
+            )
 
         assert resp.status_code == 201
         data = resp.get_json()
         assert data["discussion"]["title"] == "Best album opener?"
         assert data["discussion"]["postCount"] == 1
+        assert data["llmTriggered"] is False
         assert data["post"]["body"] == "I keep coming back to the first track."
         assert data["post"]["author"]["handle"] == "@threadstarter"
+        trigger.assert_not_called()
 
         discussion = Discussion.query.get(int(data["discussion"]["id"]))
         assert discussion.artist_id == artist.id
         assert discussion.author_user_id == user.id
         assert discussion.post_count == 1
         assert Post.query.filter_by(discussion_id=discussion.id).count() == 1
+
+    def test_triggers_llm_when_requested(self, client, make_artist, make_user):
+        artist = make_artist(name="Thread LLM Artist")
+        user = make_user(display_name="Thread LLM Starter", handle="@threadllm")
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = user.id
+
+        with patch(
+            "app.services.trigger_handler.TriggerHandlerService.handle_user_reply",
+            return_value={"job_count": 2},
+        ) as trigger:
+            resp = client.post(
+                f"/api/artists/{artist.id}/discussions",
+                json={
+                    "title": "Who should reply?",
+                    "body": "Let's invite some bot replies.",
+                    "triggerLlm": True,
+                },
+            )
+
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["llmTriggered"] is True
+        trigger.assert_called_once()
+        assert trigger.call_args.kwargs["artist_id"] == artist.id
+        assert trigger.call_args.kwargs["discussion_id"] == int(data["discussion"]["id"])
 
     def test_requires_authentication(self, client, make_artist):
         artist = make_artist(name="No Auth Thread")
@@ -466,6 +446,30 @@ class TestCreatePost:
         data = r.get_json()
         assert data["post"]["body"] == "Great song!"
         assert data["post"]["author"]["handle"] == "@sess_user"
+        assert data["llmTriggered"] is False
+
+    def test_triggers_llm_when_requested(self, client, make_artist, make_user, make_discussion):
+        a = make_artist(name="PostLlmArt")
+        u = make_user(handle="@post_llm_user")
+        d = make_discussion(a.id, u.id)
+        db.session.commit()
+
+        with client.session_transaction() as sess:
+            sess["user_id"] = u.id
+
+        with patch(
+            "app.services.trigger_handler.TriggerHandlerService.handle_user_reply",
+            return_value={"job_count": 1},
+        ) as trigger:
+            r = client.post(
+                f"/api/discussions/{d.id}/posts",
+                json={"body": "Invite replies", "triggerLlm": True},
+            )
+
+        assert r.status_code == 201
+        data = r.get_json()
+        assert data["llmTriggered"] is True
+        trigger.assert_called_once_with(artist_id=a.id, discussion_id=d.id)
 
     def test_without_session_returns_401(self, client, make_artist, make_user, make_discussion):
         a = make_artist(name="PostArt2")

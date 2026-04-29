@@ -3,11 +3,12 @@ import { useParams, Link, useNavigate } from "react-router";
 import { API_BASE, apiFetch } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, Zap, Loader2, Music, Send } from "lucide-react";
+import { ArrowLeft, MessageSquare, Loader2, Music, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Artist, Discussion } from "../data/mockData";
 import { Button } from "../components/ui/button";
 import { AuthModal } from "../components/AuthModal";
+import { Switch } from "../components/ui/switch";
 
 interface ArtistResponse {
   artist: Artist;
@@ -32,10 +33,10 @@ export default function ArtistPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [triggering, setTriggering] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [discussionTitle, setDiscussionTitle] = useState("");
   const [discussionBody, setDiscussionBody] = useState("");
+  const [triggerLlm, setTriggerLlm] = useState(true);
   const [creatingDiscussion, setCreatingDiscussion] = useState(false);
   const [discussionError, setDiscussionError] = useState<string | null>(null);
 
@@ -65,33 +66,6 @@ export default function ArtistPage() {
 
   const discussions = discussionData?.discussions ?? [];
 
-  async function handleTrigger() {
-    if (!id) return;
-    if (!user) {
-      toast.error("Sign in to trigger LLM activity");
-      return;
-    }
-    setTriggering(true);
-    try {
-      const res = await apiFetch(`${API_BASE}/api/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: "page_activation", artistId: id }),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        toast.success(`Scheduled ${result.job_count} LLM comment job(s). Check back in 10–120s!`);
-        setTimeout(() => refetchDiscussions(), 5000);
-      } else {
-        toast.error(result.error ?? "Failed to trigger LLM activity");
-      }
-    } catch {
-      toast.error("Network error — could not reach the server");
-    } finally {
-      setTriggering(false);
-    }
-  }
-
   async function handleCreateDiscussion(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
@@ -113,7 +87,7 @@ export default function ArtistPage() {
       const res = await apiFetch(`${API_BASE}/api/artists/${id}/discussions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body }),
+        body: JSON.stringify({ title, body, triggerLlm }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -207,26 +181,6 @@ export default function ArtistPage() {
             </div>
           </div>
 
-          {/* Trigger button */}
-          <div className="mb-8">
-            <Button
-              onClick={handleTrigger}
-              disabled={triggering}
-              className="bg-[#ff6b35] hover:bg-[#e55a2b] text-white font-semibold rounded-sm h-9 px-4 text-sm flex items-center gap-2 disabled:opacity-60"
-            >
-              {triggering ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Zap className="w-4 h-4" />
-              )}
-              Trigger LLM Activity
-            </Button>
-            <p className="text-[11px] text-[#888888] mt-1.5">
-              Schedules 3–5 synthetic fan comments across discussions (10–120s delay)
-              {!user && " — sign in to use this."}
-            </p>
-          </div>
-
           {/* Discussions */}
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -270,14 +224,22 @@ export default function ArtistPage() {
                     rows={4}
                     className="w-full bg-[#1a1a1a] border border-[#333333] text-sm text-white placeholder:text-[#888888] px-3 py-2 rounded-sm resize-none outline-none focus:border-[#5b9dd9]"
                   />
-                  <div className="flex items-center justify-between gap-3">
-                    {discussionError ? (
-                      <p role="alert" className="text-xs text-red-400">{discussionError}</p>
-                    ) : (
-                      <p className="text-xs text-[#888888]">
-                        Start a public thread for this artist or one of their albums.
-                      </p>
-                    )}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      {discussionError ? (
+                        <p role="alert" className="text-xs text-red-400">{discussionError}</p>
+                      ) : (
+                        <label className="flex items-center gap-2 text-xs text-[#999999]">
+                          <Switch
+                            checked={triggerLlm}
+                            onCheckedChange={setTriggerLlm}
+                            aria-label="Trigger LLM replies"
+                            className="data-[state=checked]:bg-[#5b9dd9]"
+                          />
+                          <span>Trigger LLM replies</span>
+                        </label>
+                      )}
+                    </div>
                     <Button
                       type="submit"
                       disabled={creatingDiscussion || !discussionTitle.trim() || !discussionBody.trim()}
@@ -316,7 +278,7 @@ export default function ArtistPage() {
 
             {!discLoading && discussions.length === 0 && (
               <p className="text-sm text-[#666666] py-4">
-                No discussions yet. Trigger LLM activity to generate some!
+                No discussions yet. Start the first thread.
               </p>
             )}
 

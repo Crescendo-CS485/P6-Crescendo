@@ -192,7 +192,7 @@ describe("ArtistPage", () => {
     });
     renderPage("1");
     await waitFor(() => {
-      expect(screen.getByText("No discussions yet. Trigger LLM activity to generate some!")).toBeInTheDocument();
+      expect(screen.getByText("No discussions yet. Start the first thread.")).toBeInTheDocument();
     });
   });
 
@@ -410,7 +410,7 @@ describe("Inline queryFn (discussions)", () => {
     });
     renderPage("1");
     await waitFor(() => {
-      expect(screen.getByText("No discussions yet. Trigger LLM activity to generate some!")).toBeInTheDocument();
+      expect(screen.getByText("No discussions yet. Start the first thread.")).toBeInTheDocument();
     });
   });
 
@@ -459,10 +459,10 @@ describe("Inline queryFn (discussions)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// handleTrigger — tests 29–36
+// Create discussion form
 // ---------------------------------------------------------------------------
 
-describe("handleTrigger", () => {
+describe("create discussion form", () => {
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
@@ -472,210 +472,86 @@ describe("handleTrigger", () => {
     (toast.error as jest.Mock).mockClear();
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  // Load artist so the trigger button is visible, then mock /api/events separately.
-  function mockPageLoad() {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events") return new Promise(() => {});
-      if (url.includes("/discussions"))
+  function mockPageAndCreateDiscussion() {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/artists/1/discussions" && init?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            discussion: {
+              id: "new-discussion",
+              artistId: "1",
+              title: "New thread",
+              postCount: 1,
+              lastActivityAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+            },
+            post: { id: "p1", body: "Opening comment", author: { handle: "@tester" } },
+            llmTriggered: JSON.parse(String(init.body)).triggerLlm,
+          }),
+        });
+      }
+      if (url.includes("/discussions")) {
         return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
+      }
       return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
     });
   }
 
-  async function loadAndClickTrigger() {
+  async function loadAndFillForm() {
     renderPage("1");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /trigger llm activity/i })).toBeInTheDocument()
-    );
-    fireEvent.click(screen.getByRole("button", { name: /trigger llm activity/i }));
-    // Flush microtasks so async handlers (catch/finally) run inside an act boundary.
-    await act(async () => {});
+    await screen.findByLabelText("Discussion title");
+    fireEvent.change(screen.getByLabelText("Discussion title"), {
+      target: { value: "New thread" },
+    });
+    fireEvent.change(screen.getByLabelText("Opening comment"), {
+      target: { value: "Opening comment" },
+    });
   }
 
-  // 29
-  test("trigger button calls POST /api/events with correct payload", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: true, json: async () => ({ job_count: 4 }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
+  test("posts title, body, and enabled LLM toggle by default", async () => {
+    mockPageAndCreateDiscussion();
+    await loadAndFillForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /post discussion/i }));
+
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/events",
+        "/api/artists/1/discussions",
         expect.objectContaining({
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventType: "page_activation", artistId: "1" }),
+          body: JSON.stringify({
+            title: "New thread",
+            body: "Opening comment",
+            triggerLlm: true,
+          }),
           credentials: "include",
         }),
       );
     });
   });
 
-  // 30
-  test("trigger button shows success toast with job count on 200 response", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: true, json: async () => ({ job_count: 3 }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
+  test("sends triggerLlm false when the toggle is off", async () => {
+    mockPageAndCreateDiscussion();
+    await loadAndFillForm();
+
+    fireEvent.click(screen.getByRole("switch", { name: /trigger llm replies/i }));
+    fireEvent.click(screen.getByRole("button", { name: /post discussion/i }));
+
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("3 LLM comment job(s)"));
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/artists/1/discussions",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            title: "New thread",
+            body: "Opening comment",
+            triggerLlm: false,
+          }),
+          credentials: "include",
+        }),
+      );
     });
-  });
-
-  // 31
-  test("trigger button shows error toast with server message on non-OK response", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: false, status: 500, json: async () => ({ error: "Server error" }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Server error");
-    });
-  });
-
-  // 32
-  test("trigger button shows fallback error toast when response has no error field", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to trigger LLM activity");
-    });
-  });
-
-  // 33
-  test("trigger button shows network error toast on fetch failure", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events") return Promise.reject(new Error("Network failure"));
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Network error — could not reach the server");
-    });
-  });
-
-  // 34
-  test("trigger button is disabled while request is in flight", async () => {
-    mockPageLoad();
-    await loadAndClickTrigger();
-    expect(screen.getByRole("button", { name: /trigger llm activity/i })).toBeDisabled();
-    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
-  });
-
-  // 35
-  test("trigger button re-enables after request completes (success)", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: true, json: async () => ({ job_count: 2 }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /trigger llm activity/i })).not.toBeDisabled();
-      expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
-    });
-  });
-
-  // 36
-  test("trigger button re-enables after request completes (error)", async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events") return Promise.reject(new Error("Network failure"));
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /trigger llm activity/i })).not.toBeDisabled();
-    });
-  });
-
-  // 37
-  test("setTimeout schedules refetchDiscussions 5s after successful trigger", async () => {
-    jest.useFakeTimers();
-    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: true, json: async () => ({ job_count: 2 }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
-
-    const timeoutCall = setTimeoutSpy.mock.calls.find((args) => args[1] === 5000);
-    const callback = timeoutCall![0] as () => void;
-
-    const discCallsBefore = fetchMock.mock.calls.filter(([url]: [string]) =>
-      url.includes("/discussions")
-    ).length;
-
-    await act(async () => { callback(); });
-
-    const discCallsAfter = fetchMock.mock.calls.filter(([url]: [string]) =>
-      url.includes("/discussions")
-    ).length;
-
-    expect(discCallsAfter).toBeGreaterThan(discCallsBefore);
-    setTimeoutSpy.mockRestore();
-  });
-
-  // 38
-  test("setTimeout is NOT called on failed trigger response", async () => {
-    jest.useFakeTimers();
-    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events")
-        return Promise.resolve({ ok: false, status: 500, json: async () => ({ error: "Server error" }) });
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 5000);
-    setTimeoutSpy.mockRestore();
-  });
-
-  // 39
-  test("setTimeout is NOT called on network error", async () => {
-    jest.useFakeTimers();
-    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/events") return Promise.reject(new Error("Network failure"));
-      if (url.includes("/discussions"))
-        return Promise.resolve({ ok: true, json: async () => ({ discussions: [], total: 0 }) });
-      return Promise.resolve({ ok: true, json: async () => ({ artist: makeArtist() }) });
-    });
-    await loadAndClickTrigger();
-    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 5000);
-    setTimeoutSpy.mockRestore();
   });
 });
 

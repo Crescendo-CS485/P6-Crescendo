@@ -29,7 +29,7 @@ UI state management:
 | Filter by Active Discussions | Toggle switch; appends `?active_discussions=true`. | UI filters to artists with an activity score >= 8.5. |
 | Sort by Most Recent | Select Most Recent; re-fetches with `?sort=recent`. | Artist cards re-order based on discussion count, with the most-discussed artists first. |
 | Community stats panel | Open Community page; calls `GET /api/stats` (alongside discussions fetch). | Sidebar displays Active Artists and Community Members from the stats response. |
-| Trigger event | While signed in, on the Artist page click `Trigger LLM Activity`; `POST /api/events` with `artistId` and required `eventType` (for example, `page_activation`) and session cookie. | Status 200; a success toast notification appears in the UI. Signed-out users can click the control and receive a sign-in toast/hint instead of scheduling jobs. |
+| Trigger LLM replies from a post | While signed in, start a discussion or submit a comment with the `Trigger LLM replies` toggle enabled; request body includes `triggerLlm: true`. | Status 201; the post is created and backend schedules LLM replies for that discussion. Turning the toggle off sends `triggerLlm: false` and creates only the user post. |
 | Load artist profile | Navigate to `/artists/<id>`; calls `GET /api/artists/<id>`. | Artist name, image, genre tags, and biography render correctly. |
 | Load discussion list | Artist page mount; calls `GET /api/artists/<id>/discussions`. | List of discussion threads renders beneath the profile. |
 | Open thread and load posts | Click discussion card; calls `GET /api/discussions/<id>/posts`. | Post bodies render in chronological order. |
@@ -39,7 +39,7 @@ UI state management:
 | Sign in (invalid) | Submit Sign In form with incorrect password. | 401 response; error message displayed in the login modal. |
 | Session persistence | Sign in and then navigate to a different page. | `GET /api/auth/me` on mount restores the user's session in the header. |
 | Sign out | Click Sign out; calls `POST /api/auth/logout`. | Header reverts to Sign In / Join guest state. |
-| Authenticated post | Submit post while logged in. | `POST /api/discussions/<id>/posts` follows the signed-in client flow (including author fields like `displayName` and `handle` in the request body); the new post appears with the logged-in identity, and no separate prompt for display name/handle appears during submission. |
+| Authenticated post | Submit post while logged in. | `POST /api/discussions/<id>/posts` follows the signed-in client flow; the backend derives the author from the session, the new post appears with the logged-in identity, and no separate prompt for display name/handle appears during submission. |
 | Default album list | Open Best Albums; calls `GET /api/albums`. | Album cards render with title, artist, and user scores. |
 | Filter by year | Select year (e.g., 2026); `GET /api/albums?time_range=2026`. | UI displays only albums released in the specified year. |
 | Sort by critic score | Switch sort; re-fetches with `?sort=critic_score`. | Album order matches the backend critic score ranking. |

@@ -4,6 +4,7 @@ import { API_BASE, apiFetch } from "../../lib/api";
 import { Loader2, Send } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "./ui/button";
+import { Switch } from "./ui/switch";
 
 interface CommentBoxProps {
   discussionId: string;
@@ -14,6 +15,7 @@ export function CommentBox({ discussionId, onSignInClick }: CommentBoxProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
+  const [triggerLlm, setTriggerLlm] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export function CommentBox({ discussionId, onSignInClick }: CommentBoxProps) {
       const res = await apiFetch(`${API_BASE}/api/discussions/${discussionId}/posts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: body.trim() }),
+        body: JSON.stringify({ body: body.trim(), triggerLlm }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to post comment");
@@ -79,11 +81,22 @@ export function CommentBox({ discussionId, onSignInClick }: CommentBoxProps) {
       />
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 pb-3">
+      <div className="flex flex-col gap-3 px-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
         {error ? (
           <p role="alert" className="text-xs text-red-400">{error}</p>
         ) : (
-          <span className="text-xs text-[#888888]" aria-live="polite" aria-label={`${body.length} of 2000 characters`}>{body.length}/2000</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-xs text-[#888888]" aria-live="polite" aria-label={`${body.length} of 2000 characters`}>{body.length}/2000</span>
+            <label className="flex items-center gap-2 text-xs text-[#999999]">
+              <Switch
+                checked={triggerLlm}
+                onCheckedChange={setTriggerLlm}
+                aria-label="Trigger LLM replies"
+                className="data-[state=checked]:bg-[#5b9dd9]"
+              />
+              <span>Trigger LLM replies</span>
+            </label>
+          </div>
         )}
         <Button
           type="submit"

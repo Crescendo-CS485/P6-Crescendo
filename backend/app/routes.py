@@ -7,6 +7,14 @@ from . import db
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
+def _truthy_payload_value(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return False
+
+
 def _artist_list_counts_by_id(artist_ids):
     """Discussion and distinct-listener counts per artist id (two queries for the whole page)."""
     if not artist_ids:
@@ -199,7 +207,6 @@ def get_genres():
 @bp.route("/events", methods=["POST"])
 def post_event():
     data = request.get_json(silent=True) or {}
-    event_type = data.get("eventType", "")
     artist_id = data.get("artistId")
 
     if not artist_id:
@@ -208,12 +215,9 @@ def post_event():
     if not session.get("user_id"):
         return jsonify({"error": "Authentication required"}), 401
 
-    from .services.trigger_handler import TriggerHandlerService
-    result = TriggerHandlerService().handle_event(event_type, int(artist_id))
-
-    if "error" in result:
-        return jsonify(result), 404
-    return jsonify(result), 200
+    return jsonify({
+        "error": "LLM activity is triggered from posts only",
+    }), 410
 
 
 @bp.route("/artists/<int:artist_id>/discussions")
@@ -257,6 +261,7 @@ def create_artist_discussion(artist_id):
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     body = (data.get("body") or "").strip()
+    trigger_llm = _truthy_payload_value(data.get("triggerLlm"))
 
     if not title:
         return jsonify({"error": "Title is required"}), 400
@@ -292,15 +297,17 @@ def create_artist_discussion(artist_id):
 
     db.session.commit()
 
-    from .services.trigger_handler import TriggerHandlerService
-    TriggerHandlerService().handle_user_reply(
-        artist_id=artist_id,
-        discussion_id=discussion.id,
-    )
+    if trigger_llm:
+        from .services.trigger_handler import TriggerHandlerService
+        TriggerHandlerService().handle_user_reply(
+            artist_id=artist_id,
+            discussion_id=discussion.id,
+        )
 
     return jsonify({
         "discussion": discussion.to_dict(),
         "post": post.to_dict(),
+        "llmTriggered": trigger_llm,
     }), 201
 
 
@@ -314,6 +321,7 @@ def create_post(discussion_id):
 
     data = request.get_json(silent=True) or {}
     body = (data.get("body") or "").strip()
+    trigger_llm = _truthy_payload_value(data.get("triggerLlm"))
     if not body:
         return jsonify({"error": "Body is required"}), 400
 
@@ -339,14 +347,14 @@ def create_post(discussion_id):
 
     db.session.commit()
 
-    # Trigger LLM responses to the user's post in this specific discussion
-    from .services.trigger_handler import TriggerHandlerService
-    TriggerHandlerService().handle_user_reply(
-        artist_id=discussion.artist_id,
-        discussion_id=discussion_id,
-    )
+    if trigger_llm:
+        from .services.trigger_handler import TriggerHandlerService
+        TriggerHandlerService().handle_user_reply(
+            artist_id=discussion.artist_id,
+            discussion_id=discussion_id,
+        )
 
-    return jsonify({"post": post.to_dict()}), 201
+    return jsonify({"post": post.to_dict(), "llmTriggered": trigger_llm}), 201
 
 
 @bp.route("/discussions/<int:discussion_id>/posts")

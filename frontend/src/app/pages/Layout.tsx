@@ -391,17 +391,20 @@ export default function Layout() {
             </button>
 
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#5b9dd9] to-[#4a8bc2] flex items-center justify-center">
-                <Music className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </div>
+            <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Crescendo home">
+              <img
+                src="/crescendo-logo.webp"
+                alt=""
+                aria-hidden="true"
+                className="h-10 w-10 rounded-sm object-cover"
+              />
               <div className="hidden sm:block">
                 <h1 className="text-xl font-bold text-white tracking-tight">Crescendo</h1>
                 <p className="text-[9px] text-[#666666] uppercase tracking-wider -mt-0.5">
                   Music Discovery
                 </p>
               </div>
-            </div>
+            </Link>
 
             {/* Search Bar */}
             <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
@@ -549,9 +552,12 @@ export default function Layout() {
                 Empowering independent artists through synthetic community engagement.
               </p>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-gradient-to-br from-[#5b9dd9] to-[#4a8bc2] flex items-center justify-center rounded-sm">
-                  <Music className="w-4 h-4 text-white" strokeWidth={2.5} />
-                </div>
+                <img
+                  src="/crescendo-logo.webp"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-6 w-6 rounded-sm object-cover"
+                />
                 <span className="text-xs text-[#999999]">
                   Built with transparency • <span className="text-[#7c3aed]">AI-Powered</span>
                 </span>

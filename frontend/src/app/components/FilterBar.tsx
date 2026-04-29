@@ -135,11 +135,6 @@ export function FilterBar({
                     className="data-[state=checked]:bg-[#5b9dd9]"
                   />
                 </div>
-                {activeDiscussions && (
-                  <div className="text-[10px] text-[#5b9dd9] font-mono">
-                    GET /api/artists?active_discussions=true
-                  </div>
-                )}
               </div>
             )}
 

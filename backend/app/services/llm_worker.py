@@ -125,6 +125,12 @@ def _execute_job(job_id: int, *, raise_errors: bool = True) -> bool:
         return True
 
     except Exception as exc:
+        db.session.rollback()
+        job = LLMJob.query.get(job_id)
+        if not job:
+            if raise_errors:
+                raise
+            return False
         job.status = "failed"
         job.error_msg = str(exc)
         db.session.commit()

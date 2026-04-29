@@ -1418,6 +1418,54 @@ class TestEdgeCases:
         assert notification.actor_user_id == bot.id
         assert notification.discussion_id == discussion.id
 
+    def test_llm_job_failure_rolls_back_bot_post(
+        self, client, make_artist, make_user, make_discussion, make_persona, make_post
+    ):
+        artist = make_artist(name="AtomicJobArtist")
+        human = make_user(display_name="Atomic Human", handle="@atomichuman")
+        bot = make_user(display_name="AtomicBot", handle="@atomicbot", is_bot=True)
+        make_persona(bot.id)
+        discussion = make_discussion(
+            artist.id,
+            human.id,
+            title="Atomic job thread",
+            post_count=1,
+        )
+        make_post(discussion.id, human.id, body="Human opening post")
+        job = LLMJob(
+            artist_id=artist.id,
+            discussion_id=discussion.id,
+            llm_user_id=bot.id,
+            scheduled_time=datetime.now(timezone.utc) - timedelta(minutes=1),
+            status="pending",
+        )
+        db.session.add(job)
+        db.session.commit()
+
+        from app.services.llm_worker import run_due_llm_jobs
+
+        with patch(
+            "app.services.llm_service.LLMServiceAPI.generate_comment",
+            return_value="Bot reply that should roll back",
+        ), patch(
+            "app.services.notification_service.create_reply_notifications",
+            side_effect=RuntimeError("notification insert failed"),
+        ):
+            result = run_due_llm_jobs(limit=5)
+
+        assert result["processed"] == 1
+        assert result["completed"] == 0
+        assert result["failed"] == 1
+        db.session.refresh(job)
+        db.session.refresh(discussion)
+        assert job.status == "failed"
+        assert "notification insert failed" in job.error_msg
+        assert discussion.post_count == 1
+        assert Post.query.filter_by(
+            discussion_id=discussion.id,
+            body="Bot reply that should roll back",
+        ).count() == 0
+
     def test_albums_time_range_today(self, client, make_artist, make_album):
         a = make_artist(name="TodayAlbumArtist")
         make_album(title="Hot Today", artist_id=a.id, release_date=date.today(), release_year=date.today().year)

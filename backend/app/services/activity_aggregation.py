@@ -5,6 +5,12 @@ from ..models import Artist, Discussion, Post
 
 class ActivityAggregationService:
     def update_artist_scores(self, artist_id: int) -> None:
+        """Update in-session artist activity fields.
+
+        The caller owns the transaction. LLM jobs need their post insert, discussion
+        metadata, notifications, score update, and job status change to commit
+        together so retries cannot duplicate bot replies.
+        """
         artist = Artist.query.get(artist_id)
         if not artist:
             return
@@ -41,5 +47,3 @@ class ActivityAggregationService:
         if latest:
             artist.latest_thread_title = latest.title
             artist.latest_thread_timestamp = latest.last_activity_at.isoformat()
-
-        db.session.commit()
